@@ -1,0 +1,22 @@
+apiVersion: backend.openshift.io/v1
+kind: Plugin
+metadata:
+  name: kueue-plugin
+  displayName: Kueue Plugin
+  description: Kueue queue visibility for the RHOAI Dashboard — queue topology, workload scheduling status, cohort borrowing, and resource flavor mapping.
+  version: 0.1.0
+  link:
+    url: https://github.com/rh-ai-community-plugins/kueue-plugin
+remote:
+  type: module-federation
+spec:
+  name: kueuePlugin
+  scope: kueuePlugin
+  remoteEntry: https://<your-route>/remoteEntry.js
+  paths:
+    - type: route
+      path: /kueue
+    - type: icon
+      path: kueuePlugin/Icon
+  extensions:
+    - kueuePlugin/extensions

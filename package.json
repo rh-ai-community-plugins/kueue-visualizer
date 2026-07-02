@@ -1,0 +1,48 @@
+{
+  "name": "kueue-plugin",
+  "version": "0.1.0",
+  "description": "A Kueue visibility plugin for the RHOAI Dashboard",
+  "private": true,
+  "module-federation": {
+    "remoteEntry": "remoteEntry.js"
+  },
+  "scripts": {
+    "build": "webpack --config config/webpack.prod.js",
+    "build:dev": "webpack --config config/webpack.dev.js",
+    "start:dev": "webpack serve --config config/webpack.dev.js",
+    "test": "jest --passWithNoTests",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src --ext .ts,.tsx"
+  },
+  "dependencies": {
+    "@patternfly/react-core": "^6.0.0",
+    "@patternfly/react-icons": "^6.0.0",
+    "@patternfly/react-table": "^6.0.0",
+    "@patternfly/react-topology": "^6.0.0",
+    "@openshift/dynamic-plugin-sdk": "^5.0.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "react-router-dom": "^7.0.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.0.0",
+    "@testing-library/react": "^16.0.0",
+    "@types/jest": "^29.0.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@types/react-router-dom": "^5.3.3",
+    "css-loader": "^7.0.0",
+    "html-webpack-plugin": "^5.0.0",
+    "jest": "^30.0.0",
+    "jest-environment-jsdom": "^30.0.0",
+    "style-loader": "^4.0.0",
+    "ts-jest": "^29.0.0",
+    "ts-loader": "^9.0.0",
+    "typescript": "^5.0.0",
+    "webpack": "^5.0.0",
+    "webpack-cli": "^5.0.0",
+    "webpack-dev-server": "^5.0.0",
+    "webpack-merge": "^6.0.0"
+  }
+}
