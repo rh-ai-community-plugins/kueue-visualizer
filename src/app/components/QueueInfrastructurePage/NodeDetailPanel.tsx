@@ -21,6 +21,7 @@ import {
   StackItem,
   Title,
   Divider,
+  Tooltip,
 } from '@patternfly/react-core';
 import type { ClusterQueue, LocalQueue, QueueTopologyNode, FlavorUsage } from '../../types/kueue';
 import { parseQuantity } from '../../utils/quantity';
@@ -141,24 +142,35 @@ const ClusterQueueDetail: React.FC<{
         {cq.spec.preemption ? (
           <DescriptionList isCompact>
             <DescriptionListGroup>
-              <DescriptionListTerm>Within ClusterQueue</DescriptionListTerm>
+              <DescriptionListTerm>
+                Within ClusterQueue
+                <HelpTip content="Can this queue preempt its own lower-priority workloads to admit new ones? 'Never' = no preemption within this queue." />
+              </DescriptionListTerm>
               <DescriptionListDescription>
                 <PreemptionLabel policy={cq.spec.preemption.withinClusterQueue} />
               </DescriptionListDescription>
             </DescriptionListGroup>
             <DescriptionListGroup>
-              <DescriptionListTerm>Reclaim within cohort</DescriptionListTerm>
+              <DescriptionListTerm>
+                Reclaim within cohort
+                <HelpTip content="Can this queue preempt workloads in sibling ClusterQueues to reclaim quota it lent out? 'Never' = once lent, can't force it back. 'LowerPriority' = reclaim by preempting lower-priority jobs. 'Any' = reclaim regardless of priority." />
+              </DescriptionListTerm>
               <DescriptionListDescription>
                 <PreemptionLabel policy={cq.spec.preemption.reclaimWithinCohort} />
               </DescriptionListDescription>
             </DescriptionListGroup>
             {cq.spec.preemption.borrowWithinCohort && (
               <DescriptionListGroup>
-                <DescriptionListTerm>Borrow within cohort</DescriptionListTerm>
+                <DescriptionListTerm>
+                  Borrow within cohort
+                  <HelpTip content="Can this queue preempt lower-priority workloads in sibling ClusterQueues in order to borrow their quota? 'Never' = only passively borrow unused quota, no preemption. 'LowerPriority' = may preempt lower-priority jobs in siblings to borrow." />
+                </DescriptionListTerm>
                 <DescriptionListDescription>
-                  {cq.spec.preemption.borrowWithinCohort.policy}
+                  <PreemptionLabel policy={cq.spec.preemption.borrowWithinCohort.policy} />
                   {cq.spec.preemption.borrowWithinCohort.maxPriorityThreshold !== undefined && (
-                    <> (max priority: {cq.spec.preemption.borrowWithinCohort.maxPriorityThreshold})</>
+                    <span style={{ fontSize: '0.85em', color: '#6a6e73', marginLeft: 6 }}>
+                      (only preempts workloads with priority ≤ {cq.spec.preemption.borrowWithinCohort.maxPriorityThreshold})
+                    </span>
                   )}
                 </DescriptionListDescription>
               </DescriptionListGroup>
@@ -283,19 +295,121 @@ const FlavorDetail: React.FC<{ flavorName: string; clusterQueues: ClusterQueue[]
 
 const CohortDetail: React.FC<{ cohortName: string; clusterQueues: ClusterQueue[] }> = ({ cohortName, clusterQueues }) => {
   const members = clusterQueues.filter((cq) => cq.spec.cohort === cohortName);
+
+  // Aggregate total nominal pool and total used per flavor:resource across all members.
+  const nominalMap = new Map<string, number>();
+  const usedMap = new Map<string, number>();
+  const borrowedTotalMap = new Map<string, number>();
+
+  for (const cq of members) {
+    for (const rg of cq.spec.resourceGroups ?? []) {
+      for (const fl of rg.flavors) {
+        for (const res of fl.resources) {
+          const key = `${fl.name}::${res.name}`;
+          nominalMap.set(key, (nominalMap.get(key) ?? 0) + parseQuantity(res.nominalQuota));
+        }
+      }
+    }
+    for (const fu of cq.status?.flavorsReservation ?? []) {
+      for (const res of fu.resources) {
+        const key = `${fu.name}::${res.name}`;
+        usedMap.set(key, (usedMap.get(key) ?? 0) + parseQuantity(res.total ?? '0'));
+        borrowedTotalMap.set(key, (borrowedTotalMap.get(key) ?? 0) + parseQuantity(res.borrowed ?? '0'));
+      }
+    }
+  }
+
+  const poolKeys = Array.from(nominalMap.keys());
+
+  // Format a raw quantity back to a human-readable string.
+  const fmt = (val: number, key: string): string => {
+    const res = key.split('::')[1];
+    if (res === 'memory') {
+      if (val >= 1073741824) return `${(val / 1073741824).toFixed(1)}Gi`;
+      if (val >= 1048576) return `${(val / 1048576).toFixed(0)}Mi`;
+      return `${val}`;
+    }
+    return val % 1 === 0 ? String(val) : val.toFixed(2);
+  };
+
   return (
     <Stack hasGutter>
-      <StackItem>
-        <strong>Member ClusterQueues:</strong>
-      </StackItem>
-      {members.map((cq) => (
-        <StackItem key={cq.metadata.name}>
-          <Label color="red" isCompact>{cq.metadata.name}</Label>
-          <span style={{ marginLeft: '0.5rem', fontSize: '0.85em', color: '#6a6e73' }}>
-            {cq.status?.admittedWorkloads ?? 0} admitted / {cq.status?.pendingWorkloads ?? 0} pending
-          </span>
+      {/* Cohort pool bars */}
+      {poolKeys.length > 0 && (
+        <StackItem>
+          <div style={{ fontSize: '0.78em', fontWeight: 600, marginBottom: '0.5rem', color: '#151515' }}>
+            Cohort quota pool
+            <HelpTip content="Total nominal quota summed across all member ClusterQueues. The bar shows how much of the combined pool is currently in use." />
+          </div>
+          {poolKeys.map((key) => {
+            const [flavorName, resName] = key.split('::');
+            const nominal = nominalMap.get(key) ?? 0;
+            const used = usedMap.get(key) ?? 0;
+            const borrowed = borrowedTotalMap.get(key) ?? 0;
+            const pct = nominal > 0 ? Math.min(100, Math.round((used / nominal) * 100)) : 0;
+            return (
+              <div key={key} style={{ marginBottom: '0.5rem' }}>
+                <div style={{ fontSize: '0.78em', color: '#6a6e73', marginBottom: '0.15rem' }}>
+                  <strong style={{ color: '#151515' }}>{flavorName}</strong> · {resName}
+                  {': '}{fmt(used, key)} / {fmt(nominal, key)}
+                  {borrowed > 0 && (
+                    <Label color="orange" isCompact style={{ marginLeft: 6 }}>
+                      {fmt(borrowed, key)} borrowed across cohort
+                    </Label>
+                  )}
+                </div>
+                <Progress value={pct} size={ProgressSize.sm} aria-label={`${resName} cohort usage`} />
+              </div>
+            );
+          })}
         </StackItem>
-      ))}
+      )}
+
+      <StackItem><Divider /></StackItem>
+
+      {/* Per-member table */}
+      <StackItem>
+        <div style={{ fontSize: '0.78em', fontWeight: 600, marginBottom: '0.4rem' }}>
+          Member ClusterQueues
+        </div>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82em' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid #d2d2d2', color: '#6a6e73' }}>
+              <th style={{ textAlign: 'left', padding: '2px 4px' }}>Queue</th>
+              <th style={{ textAlign: 'right', padding: '2px 4px' }}>Admitted</th>
+              <th style={{ textAlign: 'right', padding: '2px 4px' }}>Pending</th>
+              <th style={{ textAlign: 'left', padding: '2px 4px' }}>Borrowing</th>
+            </tr>
+          </thead>
+          <tbody>
+            {members.map((cq) => {
+              const borrowParts: string[] = [];
+              for (const fu of cq.status?.flavorsReservation ?? []) {
+                for (const res of fu.resources) {
+                  const b = parseQuantity(res.borrowed ?? '0');
+                  if (b > 0) borrowParts.push(`${res.borrowed} ${res.name.split('/').pop()}`);
+                }
+              }
+              return (
+                <tr key={cq.metadata.name} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                  <td style={{ padding: '3px 4px' }}>
+                    <Label color="red" isCompact>{cq.metadata.name}</Label>
+                  </td>
+                  <td style={{ textAlign: 'right', padding: '3px 4px' }}>{cq.status?.admittedWorkloads ?? 0}</td>
+                  <td style={{ textAlign: 'right', padding: '3px 4px', color: (cq.status?.pendingWorkloads ?? 0) > 0 ? '#EC7A08' : 'inherit' }}>
+                    {cq.status?.pendingWorkloads ?? 0}
+                  </td>
+                  <td style={{ padding: '3px 4px' }}>
+                    {borrowParts.length > 0
+                      ? <span style={{ color: '#EC7A08', fontWeight: 600 }}>↗ {borrowParts.join(', ')}</span>
+                      : <span style={{ color: '#6a6e73' }}>—</span>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </StackItem>
     </Stack>
   );
 };
@@ -333,6 +447,21 @@ const PreemptionLabel: React.FC<{ policy: string }> = ({ policy }) => {
   const color = policy === 'Never' ? 'grey' : policy === 'LowerPriority' ? 'orange' : 'red';
   return <Label color={color as any} isCompact>{policy}</Label>;
 };
+
+const HelpTip: React.FC<{ content: string }> = ({ content }) => (
+  <Tooltip content={content} position="right">
+    <span
+      style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: 14, height: 14, borderRadius: '50%',
+        background: '#6a6e73', color: '#fff',
+        fontSize: '0.65em', fontWeight: 700,
+        cursor: 'help', marginLeft: 5, verticalAlign: 'middle', flexShrink: 0,
+      }}
+      aria-label={content}
+    >?</span>
+  </Tooltip>
+);
 
 function kindColor(kind: string): 'blue' | 'red' | 'purple' | 'green' | 'grey' {
   const map: Record<string, 'blue' | 'red' | 'purple' | 'green' | 'grey'> = {

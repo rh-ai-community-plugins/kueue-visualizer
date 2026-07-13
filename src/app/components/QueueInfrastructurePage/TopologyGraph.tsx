@@ -27,7 +27,7 @@ import {
   useAnchor,
 } from '@patternfly/react-topology';
 import type { ShapeProps, NodeModel, EdgeModel, EdgeProps } from '@patternfly/react-topology';
-import type { ClusterQueue, LocalQueue, ResourceFlavor, QueueTopologyNode } from '../../types/kueue';
+import type { ClusterQueue, LocalQueue, QueueTopologyNode } from '../../types/kueue';
 import { parseQuantity } from '../../utils/quantity';
 
 const NODE_NAMESPACE = 'Namespace';
@@ -160,14 +160,70 @@ const SHAPE_BY_KIND: Record<string, React.FC<ShapeProps>> = {
 const getCustomShape = (element: Node): React.FC<ShapeProps> =>
   SHAPE_BY_KIND[element.getData()?.kind as string] ?? SHAPE_BY_KIND[NODE_CLUSTER_QUEUE];
 
-// Edge component that renders a label from element data.
-const LabeledEdge: React.FC<EdgeProps> = (props) => {
-  const label = (props.element.getData?.() as { label?: string } | undefined)?.label ?? '';
-  return <DefaultEdge {...props} label={label} />;
+// Plain edge (no label).
+const PlainEdge: React.FC<EdgeProps> = (props) => <DefaultEdge {...props} />;
+
+// Borrowing edge — draws an orange SVG path + inline arrowhead + pill label.
+const BorrowingEdge: React.FC<EdgeProps> = (props) => {
+  const { element } = props;
+  const label = (element.getData?.() as { label?: string } | undefined)?.label ?? '';
+  const startPoint = element.getStartPoint();
+  const endPoint = element.getEndPoint();
+  const bendpoints = element.getBendpoints?.() ?? [];
+  const allPoints = [startPoint, ...bendpoints, endPoint];
+
+  // Find the longest segment — place label at its midpoint.
+  let bestLen = -1;
+  let midX = (startPoint.x + endPoint.x) / 2;
+  let midY = (startPoint.y + endPoint.y) / 2;
+  for (let i = 0; i < allPoints.length - 1; i++) {
+    const dx = allPoints[i + 1].x - allPoints[i].x;
+    const dy = allPoints[i + 1].y - allPoints[i].y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len > bestLen) { bestLen = len; midX = (allPoints[i].x + allPoints[i + 1].x) / 2; midY = (allPoints[i].y + allPoints[i + 1].y) / 2; }
+  }
+
+  // Inline arrowhead — avoids unreliable url(#marker) in nested SVG groups.
+  const arrowSize = 10;
+  const prev = allPoints[allPoints.length - 2];
+  const angle = Math.atan2(endPoint.y - prev.y, endPoint.x - prev.x);
+  const tip = endPoint;
+  const left = { x: tip.x - arrowSize * Math.cos(angle - Math.PI / 6), y: tip.y - arrowSize * Math.sin(angle - Math.PI / 6) };
+  const right = { x: tip.x - arrowSize * Math.cos(angle + Math.PI / 6), y: tip.y - arrowSize * Math.sin(angle + Math.PI / 6) };
+  // Shorten last segment so the line ends at the base of the arrowhead.
+  const shortenedEnd = { x: tip.x - arrowSize * Math.cos(angle), y: tip.y - arrowSize * Math.sin(angle) };
+  const pathPoints = [...allPoints.slice(0, -1), shortenedEnd];
+  const pathD = pathPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+
+  return (
+    <g>
+      {/* DefaultEdge hidden but present for click/selection handling */}
+      <g style={{ opacity: 0 }}>
+        <DefaultEdge {...props} />
+      </g>
+      {/* Orange edge line */}
+      <path d={pathD} stroke="#EC7A08" strokeWidth={2.5} fill="none" style={{ pointerEvents: 'none' }} />
+      {/* Inline arrowhead */}
+      <polygon
+        points={`${tip.x},${tip.y} ${left.x},${left.y} ${right.x},${right.y}`}
+        fill="#EC7A08"
+        style={{ pointerEvents: 'none' }}
+      />
+      {/* Pill label centered on longest segment */}
+      {label && (
+        <g transform={`translate(${midX}, ${midY})`} style={{ pointerEvents: 'none' }}>
+          <rect x={-34} y={-9} width={68} height={18} rx={9} fill="#EC7A08" />
+          <text textAnchor="middle" dominantBaseline="central" fill="white" fontSize={10} fontWeight="bold">
+            {label}
+          </text>
+        </g>
+      )}
+    </g>
+  );
 };
 
 // Component factory — stable module-level reference.
-const componentFactory: ComponentFactory = (kind) => {
+const componentFactory: ComponentFactory = (kind, type) => {
   if (kind === ModelKind.graph) return withPanZoom({ zoomMin: 0.001 })(GraphComponent);
   if (kind === ModelKind.node) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -175,7 +231,10 @@ const componentFactory: ComponentFactory = (kind) => {
       <DefaultNode {...props} truncateLength={22} getCustomShape={getCustomShape} showLabel />
     ));
   }
-  if (kind === ModelKind.edge) return LabeledEdge;
+  if (kind === ModelKind.edge) {
+    if (type === 'edge-borrow') return BorrowingEdge;
+    return PlainEdge;
+  }
   return undefined;
 };
 
@@ -195,7 +254,6 @@ const LEGEND_ENTRIES = [
   { kind: 'LocalQueue', color: NODE_COLORS[NODE_LOCAL_QUEUE], desc: 'Namespace-scoped queue. Users submit workloads here; maps to a ClusterQueue.' },
   { kind: 'ClusterQueue', color: NODE_COLORS[NODE_CLUSTER_QUEUE], desc: 'Cluster-wide resource pool with defined quotas. Admits workloads from LocalQueues.' },
   { kind: 'Cohort', color: NODE_COLORS[NODE_COHORT], desc: 'Group of ClusterQueues that can lend/borrow resources from each other.' },
-  { kind: 'ResourceFlavor', color: NODE_COLORS[NODE_FLAVOR], desc: 'Hardware profile (GPU type, node type) that workloads are assigned to.' },
 ];
 
 const TopologyLegend: React.FC = () => {
@@ -267,7 +325,6 @@ const TopologyLegend: React.FC = () => {
 interface TopologyGraphProps {
   clusterQueues: ClusterQueue[];
   localQueues: LocalQueue[];
-  flavors: ResourceFlavor[];
   selectedNodeId: string | null;
   filterNamespace: string;
   onNodeSelect: (node: QueueTopologyNode | null) => void;
@@ -281,7 +338,7 @@ const TopologyGraphInner: React.FC<TopologyGraphProps> = ({
   selectedNodeId,
   filterNamespace,
   onNodeSelect,
-}) => {
+ }) => {
   const controller = useVisualizationController();
   // Track previous structural state so data-only refreshes don't trigger re-layout (which resets zoom/pan).
   const prevFilterNs = useRef<string | undefined>(undefined);
@@ -319,8 +376,6 @@ const TopologyGraphInner: React.FC<TopologyGraphProps> = ({
   useEffect(() => {
     const nodes: NodeModel[] = [];
     const edges: EdgeModel[] = [];
-    const addedFlavors = new Set<string>();
-    const addedEdges = new Set<string>();
 
     const visibleLQs = filterNamespace
       ? localQueues.filter((lq) => lq.metadata.namespace === filterNamespace)
@@ -370,35 +425,16 @@ const TopologyGraphInner: React.FC<TopologyGraphProps> = ({
         const borrowLabel = computeBorrowingLabel(cq);
         edges.push({
           id: `e:${cqId}->cohort:${cq.spec.cohort}`,
-          type: 'edge',
+          type: borrowLabel ? 'edge-borrow' : 'edge',
           source: cqId,
           target: `cohort:${cq.spec.cohort}`,
           data: borrowLabel ? { label: borrowLabel } : {},
         });
       }
 
-      for (const rg of cq.spec.resourceGroups ?? []) {
-        for (const fl of rg.flavors) {
-          const flId = `flavor:${fl.name}`;
-          if (!addedFlavors.has(fl.name)) {
-            addedFlavors.add(fl.name);
-            nodes.push({
-              id: flId,
-              type: NODE_FLAVOR,
-              label: fl.name,
-              shape: NodeShape.ellipse,
-              width: 130,
-              height: 50,
-              data: { kind: NODE_FLAVOR, name: fl.name },
-            });
-          }
-          const eid = `e:${cqId}->${flId}`;
-          if (!addedEdges.has(eid)) {
-            addedEdges.add(eid);
-            edges.push({ id: eid, type: 'edge', source: cqId, target: flId });
-          }
-        }
-      }
+      // ResourceFlavor nodes are intentionally omitted from the graph —
+      // they create many-to-many crossing edges. Flavor quota details are
+      // shown in the ClusterQueue detail panel instead.
     }
 
     // Namespace and LocalQueue nodes
@@ -440,8 +476,9 @@ const TopologyGraphInner: React.FC<TopologyGraphProps> = ({
       edges.push({ id: `e:${lqId}->${cqId}`, type: 'edge', source: lqId, target: cqId });
     }
 
-    // Detect structural changes (new/removed nodes or filter change) vs pure data refresh.
-    const nodeIdKey = nodes.map((n) => n.id).sort().join(',');
+    // Detect structural changes (new/removed nodes, filter change, or borrowing state change) vs pure data refresh.
+    const borrowingEdgeIds = edges.filter((e) => e.type === 'edge-borrow').map((e) => e.id).sort().join(',');
+    const nodeIdKey = nodes.map((n) => n.id).sort().join(',') + '|' + borrowingEdgeIds;
     const isStructural = filterNamespace !== prevFilterNs.current || nodeIdKey !== prevNodeIds.current;
     prevFilterNs.current = filterNamespace;
     prevNodeIds.current = nodeIdKey;

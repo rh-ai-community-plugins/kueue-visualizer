@@ -137,7 +137,7 @@ const QueueInfrastructurePage: React.FC = () => {
                 <TopologyGraph
                   clusterQueues={clusterQueues}
                   localQueues={localQueues}
-                  flavors={flavors}
+
                   filterNamespace={filterNamespace}
                   onNodeSelect={setSelectedNode}
                   selectedNodeId={selectedNode?.id ?? null}
