@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   PageSection,
   Title,
@@ -18,27 +19,55 @@ import {
   SearchInput,
   Divider,
 } from '@patternfly/react-core';
-import { useClusterQueues, useLocalQueues, useResourceFlavors, useKueueNamespaces } from '../../hooks/useKueueResources';
+import {
+  useClusterQueues,
+  useLocalQueues,
+  useResourceFlavors,
+  useKueueNamespaces,
+} from '../../hooks/useKueueResources';
 import TopologyGraph from './TopologyGraph';
 import NodeDetailPanel from './NodeDetailPanel';
 import CohortLedger from './CohortLedger';
 import NamespacesPanel from './NamespacesPanel';
-import type { QueueTopologyNode } from '../../types/kueue';
+import type { QueueTopologyNode, LocalQueue } from '../../types/kueue';
 
 const QueueInfrastructurePage: React.FC = () => {
+  const [searchParams] = useSearchParams();
+
   const { clusterQueues, loading: cqLoading, error: cqError } = useClusterQueues();
   const { localQueues, loading: lqLoading, error: lqError } = useLocalQueues();
   const { flavors, loading: flLoading, error: flError } = useResourceFlavors();
   const { namespaces, loading: nsLoading, error: nsError } = useKueueNamespaces();
+
   const [selectedNode, setSelectedNode] = useState<QueueTopologyNode | null>(null);
-  const [filterNamespace, setFilterNamespace] = useState('');
+  // Pre-populate namespace filter from URL param (e.g. coming from Workloads page).
+  const [filterNamespace, setFilterNamespace] = useState(() => searchParams.get('ns') ?? '');
   const [nsSelectOpen, setNsSelectOpen] = useState(false);
   const [nsSearch, setNsSearch] = useState('');
+
+  // Auto-select a LocalQueue node when navigated here via ?lq= param (e.g. from Workloads table).
+  const lqParam = searchParams.get('lq') ?? '';
+  const autoSelectedRef = useRef(false);
+  useEffect(() => {
+    if (!lqParam || autoSelectedRef.current || localQueues.length === 0) return;
+    const lq = localQueues.find(
+      (l: LocalQueue) => l.metadata.name === lqParam && l.metadata.namespace === filterNamespace,
+    );
+    if (lq) {
+      setSelectedNode({
+        id: `lq:${lq.metadata.namespace}:${lq.metadata.name}`,
+        kind: 'LocalQueue',
+        name: lq.metadata.name,
+        namespace: lq.metadata.namespace,
+        data: lq,
+      });
+      autoSelectedRef.current = true;
+    }
+  }, [localQueues, lqParam, filterNamespace]);
 
   const loading = cqLoading || lqLoading || flLoading || nsLoading;
   const error = cqError ?? lqError ?? flError ?? nsError;
 
-  // Unique namespace names from kueue-managed namespaces
   const namespaceOptions = namespaces.map((ns) => ns.name).sort();
 
   return (
@@ -68,7 +97,11 @@ const QueueInfrastructurePage: React.FC = () => {
                   <Select
                     isOpen={nsSelectOpen}
                     onOpenChange={(o) => { setNsSelectOpen(o); if (!o) setNsSearch(''); }}
-                    onSelect={(_, v) => { setFilterNamespace(v as string); setNsSelectOpen(false); setNsSearch(''); }}
+                    onSelect={(_, v) => {
+                      setFilterNamespace(v as string);
+                      setNsSelectOpen(false);
+                      setNsSearch('');
+                    }}
                     toggle={(ref) => (
                       <MenuToggle ref={ref} onClick={() => setNsSelectOpen(!nsSelectOpen)}>
                         {filterNamespace || 'All namespaces'}

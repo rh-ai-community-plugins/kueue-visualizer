@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Table,
   Thead,
@@ -7,9 +8,10 @@ import {
   Th,
   Td,
 } from '@patternfly/react-table';
-import { Label, EmptyState, EmptyStateBody } from '@patternfly/react-core';
-import type { Workload, ClusterQueue, WorkloadPhase } from '../../types/kueue';
+import { Label, EmptyState, EmptyStateBody, Button } from '@patternfly/react-core';
+import type { Workload, ClusterQueue, LocalQueue, WorkloadPhase } from '../../types/kueue';
 import { getWorkloadPhase, computeWorkloadQueueInfo } from '../../hooks/useKueueResources';
+
 
 const PHASE_COLORS: Record<WorkloadPhase, 'grey' | 'blue' | 'green' | 'red' | 'orange'> = {
   Pending: 'orange',
@@ -22,6 +24,8 @@ const PHASE_COLORS: Record<WorkloadPhase, 'grey' | 'blue' | 'green' | 'red' | 'o
 interface WorkloadTableProps {
   workloads: Workload[];
   clusterQueues: ClusterQueue[];
+  localQueues: LocalQueue[];
+  topOwnerMap: Map<string, { kind: string; name: string }>;
   phaseFilter: WorkloadPhase | '';
   onSelect: (w: Workload) => void;
   selectedWorkload: Workload | null;
@@ -30,10 +34,13 @@ interface WorkloadTableProps {
 const WorkloadTable: React.FC<WorkloadTableProps> = ({
   workloads,
   clusterQueues,
+  localQueues,
+  topOwnerMap,
   phaseFilter,
   onSelect,
   selectedWorkload,
 }) => {
+  const navigate = useNavigate();
   const rows = workloads
     .map((w) => ({ w, info: computeWorkloadQueueInfo(w, workloads, clusterQueues) }))
     .filter(({ info }) => !phaseFilter || info.phase === phaseFilter)
@@ -61,6 +68,7 @@ const WorkloadTable: React.FC<WorkloadTableProps> = ({
       <Thead>
         <Tr>
           <Th>Name</Th>
+          <Th>Type</Th>
           <Th>Namespace</Th>
           <Th>Local Queue</Th>
           <Th>ClusterQueue</Th>
@@ -83,13 +91,72 @@ const WorkloadTable: React.FC<WorkloadTableProps> = ({
               onRowClick={() => onSelect(w)}
               style={{ cursor: 'pointer' }}
             >
-              <Td>{w.metadata.name}</Td>
-              <Td>{w.metadata.namespace ?? '—'}</Td>
-              <Td>{w.spec.queueName}</Td>
               <Td>
-                {w.status?.admission?.clusterQueue
-                  ? <Label color="red" isCompact>{w.status.admission.clusterQueue}</Label>
-                  : <span style={{ color: '#6a6e73' }}>—</span>}
+                {(() => {
+                  const top = topOwnerMap.get(`${w.metadata.namespace}/${w.metadata.name}`);
+                  const displayName = top?.name
+                    ?? w.metadata.annotations?.['kueue.x-k8s.io/job-owner-name']
+                    ?? w.metadata.ownerReferences?.find((r) => r.controller)?.name
+                    ?? w.metadata.ownerReferences?.[0]?.name;
+                  return displayName ? (
+                    <>
+                      {displayName}
+                      <span style={{ color: '#6a6e73', fontSize: '0.78em', marginLeft: '0.4rem' }}>
+                        ({w.metadata.name})
+                      </span>
+                    </>
+                  ) : w.metadata.name;
+                })()}
+              </Td>
+              <Td>
+                {(() => {
+                  const top = topOwnerMap.get(`${w.metadata.namespace}/${w.metadata.name}`);
+                  if (top) return top.kind;
+                  const gvk = w.metadata.annotations?.['kueue.x-k8s.io/job-owner-gvk'];
+                  const kind = gvk?.match(/Kind=(\w+)/)?.[1]
+                    ?? w.metadata.ownerReferences?.find((r) => r.controller)?.kind
+                    ?? w.metadata.ownerReferences?.[0]?.kind;
+                  return kind ?? <span style={{ color: '#6a6e73' }}>—</span>;
+                })()}
+              </Td>
+              <Td>{w.metadata.namespace ?? '—'}</Td>
+              <Td>
+                {localQueues.some(
+                  (lq) => lq.metadata.name === w.spec.queueName && lq.metadata.namespace === w.metadata.namespace,
+                ) ? (
+                  <Button
+                    variant="link"
+                    isInline
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(
+                        `/kueue/infrastructure?ns=${encodeURIComponent(w.metadata.namespace ?? '')}&lq=${encodeURIComponent(w.spec.queueName)}`,
+                      );
+                    }}
+                  >
+                    {w.spec.queueName}
+                  </Button>
+                ) : (
+                  <span
+                    title={`LocalQueue "${w.spec.queueName}" does not exist in namespace "${w.metadata.namespace}"`}
+                    style={{ color: '#EC7A08', cursor: 'help' }}
+                  >
+                    {w.spec.queueName} ⚠
+                  </span>
+                )}
+              </Td>
+              <Td>
+                {(() => {
+                  const admittedCQ = w.status?.admission?.clusterQueue;
+                  if (admittedCQ) return <Label color="red" isCompact>{admittedCQ}</Label>;
+                  const lq = localQueues.find(
+                    (l) => l.metadata.name === w.spec.queueName && l.metadata.namespace === w.metadata.namespace,
+                  );
+                  const inferredCQ = lq?.spec.clusterQueue;
+                  return inferredCQ
+                    ? <><Label color="red" isCompact variant="outline">{inferredCQ}</Label></>
+                    : <span style={{ color: '#6a6e73' }}>—</span>;
+                })()}
               </Td>
               <Td>
                 <Label color={PHASE_COLORS[info.phase]} isCompact>{info.phase}</Label>

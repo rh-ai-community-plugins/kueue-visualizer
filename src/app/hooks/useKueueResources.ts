@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type {
   ClusterQueue,
   LocalQueue,
@@ -13,6 +13,7 @@ import type {
 
 const KUEUE_API = '/api/k8s/apis/kueue.x-k8s.io/v1beta1';
 const CORE_API = '/api/k8s/api/v1';
+const APPS_API = '/api/k8s/apis/apps/v1';
 
 async function fetchKueue<T>(path: string): Promise<T[]> {
   const res = await fetch(`${KUEUE_API}${path}`);
@@ -21,6 +22,17 @@ async function fetchKueue<T>(path: string): Promise<T[]> {
   }
   const list: KubernetesList<T> = await res.json();
   return list.items ?? [];
+}
+
+// --- Auto-refresh ---
+
+export function useInterval(callback: () => void, delayMs: number): void {
+  const savedCallback = useRef(callback);
+  useEffect(() => { savedCallback.current = callback; }, [callback]);
+  useEffect(() => {
+    const id = setInterval(() => savedCallback.current(), delayMs);
+    return () => clearInterval(id);
+  }, [delayMs]);
 }
 
 // --- Individual resource hooks ---
@@ -134,6 +146,83 @@ export function useKueueNamespaces() {
   useEffect(() => { refresh(); }, [refresh]);
 
   return { namespaces, loading, error, refresh };
+}
+
+// --- Owner chain resolution ---
+// Walks the full ownerReference chain upwards until reaching a resource with no owner
+// (or an unknown/CRD kind that can't be fetched further).
+// Returns a Map<"<ns>/<workload-name>", { kind, name }> with the top-level resource.
+
+// Known intermediate K8s resources and their API paths. Anything not listed (CRDs etc.)
+// is considered a "user-facing" top-level resource and stops the traversal.
+const TRAVERSABLE_PATHS: Record<string, string> = {
+  Pod:        '/api/k8s/api/v1/namespaces/{ns}/pods/{name}',
+  ReplicaSet: `${APPS_API}/namespaces/{ns}/replicasets/{name}`,
+  Deployment: `${APPS_API}/namespaces/{ns}/deployments/{name}`,
+  StatefulSet:`${APPS_API}/namespaces/{ns}/statefulsets/{name}`,
+  DaemonSet:  `${APPS_API}/namespaces/{ns}/daemonsets/{name}`,
+  Job:        '/api/k8s/apis/batch/v1/namespaces/{ns}/jobs/{name}',
+  CronJob:    '/api/k8s/apis/batch/v1/namespaces/{ns}/cronjobs/{name}',
+};
+
+async function resolveTopOwner(
+  ns: string,
+  kind: string,
+  name: string,
+  depth = 0,
+): Promise<{ kind: string; name: string }> {
+  if (depth > 8) return { kind, name };
+  const urlTemplate = TRAVERSABLE_PATHS[kind];
+  if (!urlTemplate) return { kind, name }; // CRD / user-facing resource — stop
+  try {
+    const url = urlTemplate.replace('{ns}', ns).replace('{name}', encodeURIComponent(name));
+    const res = await fetch(url);
+    if (!res.ok) return { kind, name };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const obj = await res.json() as { metadata?: { ownerReferences?: any[] } };
+    const ownerRef = (obj.metadata?.ownerReferences ?? []).find((r) => r.controller)
+      ?? obj.metadata?.ownerReferences?.[0];
+    if (!ownerRef) return { kind, name }; // No parent — this is the top
+    return resolveTopOwner(ns, ownerRef.kind as string, ownerRef.name as string, depth + 1);
+  } catch {
+    return { kind, name };
+  }
+}
+
+export function useWorkloadTopOwner(
+  workloads: Workload[],
+): Map<string, { kind: string; name: string }> {
+  const [ownerMap, setOwnerMap] = useState<Map<string, { kind: string; name: string }>>(new Map());
+
+  useEffect(() => {
+    const entries = workloads.flatMap((w) => {
+      const gvk = w.metadata.annotations?.['kueue.x-k8s.io/job-owner-gvk'] ?? '';
+      const ownerKind = gvk.match(/Kind=(\w+)/)?.[1]
+        ?? w.metadata.ownerReferences?.find((r) => r.controller)?.kind
+        ?? w.metadata.ownerReferences?.[0]?.kind;
+      const ownerName = w.metadata.annotations?.['kueue.x-k8s.io/job-owner-name']
+        ?? w.metadata.ownerReferences?.find((r) => r.controller)?.name
+        ?? w.metadata.ownerReferences?.[0]?.name;
+      if (!ownerKind || !ownerName || !w.metadata.namespace) return [];
+      return [{
+        workloadKey: `${w.metadata.namespace}/${w.metadata.name}`,
+        ns: w.metadata.namespace,
+        ownerKind,
+        ownerName,
+      }];
+    });
+
+    if (entries.length === 0) return;
+
+    Promise.all(
+      entries.map(({ workloadKey, ns, ownerKind, ownerName }) =>
+        resolveTopOwner(ns, ownerKind, ownerName)
+          .then((top) => [workloadKey, top] as const),
+      ),
+    ).then((results) => setOwnerMap(new Map(results)));
+  }, [workloads]);
+
+  return ownerMap;
 }
 
 // --- Derived data ---

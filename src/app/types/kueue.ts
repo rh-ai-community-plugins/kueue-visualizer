@@ -14,6 +14,7 @@ export interface KubernetesResource {
     creationTimestamp: string;
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
+    ownerReferences?: Array<{ kind: string; name: string; apiVersion: string; uid: string; controller?: boolean }>;
   };
 }
 

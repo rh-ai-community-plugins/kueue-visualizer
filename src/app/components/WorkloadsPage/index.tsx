@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   PageSection,
   Title,
@@ -15,8 +16,14 @@ import {
   Drawer,
   DrawerContent,
   DrawerContentBody,
+  Button,
 } from '@patternfly/react-core';
-import { useWorkloads, useClusterQueues } from '../../hooks/useKueueResources';
+import {
+  useWorkloads,
+  useClusterQueues,
+  useLocalQueues,
+  useWorkloadTopOwner,
+} from '../../hooks/useKueueResources';
 import WorkloadTable from './WorkloadTable';
 import WorkloadDrawer from './WorkloadDrawer';
 import type { Workload, WorkloadPhase } from '../../types/kueue';
@@ -24,25 +31,51 @@ import type { Workload, WorkloadPhase } from '../../types/kueue';
 const PHASE_OPTIONS: WorkloadPhase[] = ['Pending', 'Admitted', 'Running', 'Finished', 'Failed'];
 
 const WorkloadsPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
+
   const { workloads, loading, error } = useWorkloads();
   const { clusterQueues } = useClusterQueues();
+  const { localQueues } = useLocalQueues();
+  const topOwnerMap = useWorkloadTopOwner(workloads);
+
   const [selectedWorkload, setSelectedWorkload] = useState<Workload | null>(null);
-  const [searchText, setSearchText] = useState('');
+  // Pre-populate from URL params (e.g. navigating from Infra topology node).
+  const [searchText, setSearchText] = useState(() => searchParams.get('queue') ?? '');
+  const [nsFilter, setNsFilter] = useState(() => searchParams.get('ns') ?? '');
+  const [cqFilter, setCqFilter] = useState(() => searchParams.get('cq') ?? '');
   const [phaseFilter, setPhaseFilter] = useState<WorkloadPhase | ''>('');
   const [phaseOpen, setPhaseOpen] = useState(false);
 
-  const filtered = workloads.filter((w) =>
-    !searchText ||
-    w.metadata.name.includes(searchText) ||
-    (w.metadata.namespace ?? '').includes(searchText) ||
-    w.spec.queueName.includes(searchText)
-  );
+  const filtered = workloads.filter((w) => {
+    if (nsFilter && w.metadata.namespace !== nsFilter) return false;
+    if (cqFilter) {
+      const admittedCQ = w.status?.admission?.clusterQueue;
+      if (admittedCQ !== cqFilter) {
+        // For pending workloads, fall back to checking via the LocalQueue's bound ClusterQueue.
+        const lq = localQueues.find(
+          (l) => l.metadata.name === w.spec.queueName && l.metadata.namespace === w.metadata.namespace,
+        );
+        if (lq?.spec.clusterQueue !== cqFilter) return false;
+      }
+    }
+    if (
+      searchText &&
+      !w.metadata.name.includes(searchText) &&
+      !(w.metadata.namespace ?? '').includes(searchText) &&
+      !w.spec.queueName.includes(searchText)
+    ) {
+      return false;
+    }
+    return true;
+  });
 
   const panelContent = selectedWorkload ? (
     <WorkloadDrawer
       workload={selectedWorkload}
       allWorkloads={workloads}
       clusterQueues={clusterQueues}
+      localQueues={localQueues}
+      topOwner={topOwnerMap.get(`${selectedWorkload.metadata.namespace}/${selectedWorkload.metadata.name}`)}
       onClose={() => setSelectedWorkload(null)}
     />
   ) : undefined;
@@ -70,6 +103,22 @@ const WorkloadsPage: React.FC = () => {
                 onClear={() => setSearchText('')}
               />
             </ToolbarItem>
+            {nsFilter && (
+              <ToolbarItem>
+                <span style={{ fontSize: '0.85em' }}>
+                  Namespace: <strong>{nsFilter}</strong>{' '}
+                  <Button variant="link" isInline onClick={() => setNsFilter('')}>✕</Button>
+                </span>
+              </ToolbarItem>
+            )}
+            {cqFilter && (
+              <ToolbarItem>
+                <span style={{ fontSize: '0.85em' }}>
+                  ClusterQueue: <strong>{cqFilter}</strong>{' '}
+                  <Button variant="link" isInline onClick={() => setCqFilter('')}>✕</Button>
+                </span>
+              </ToolbarItem>
+            )}
             <ToolbarItem>
               <Select
                 isOpen={phaseOpen}
@@ -103,6 +152,8 @@ const WorkloadsPage: React.FC = () => {
                 <WorkloadTable
                   workloads={filtered}
                   clusterQueues={clusterQueues}
+                  localQueues={localQueues}
+                  topOwnerMap={topOwnerMap}
                   phaseFilter={phaseFilter}
                   onSelect={setSelectedWorkload}
                   selectedWorkload={selectedWorkload}

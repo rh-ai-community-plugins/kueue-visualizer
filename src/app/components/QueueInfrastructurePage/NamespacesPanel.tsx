@@ -12,7 +12,6 @@ import {
   LabelGroup,
   EmptyState,
   EmptyStateBody,
-  ExpandableSection,
 } from '@patternfly/react-core';
 import type { KueueNamespace, LocalQueue, ClusterQueue } from '../../types/kueue';
 
@@ -119,7 +118,7 @@ const NamespacesPanel: React.FC<NamespacesPanelProps> = ({ namespaces, localQueu
 
               {isExpanded && (
                 <Tr isExpanded>
-                  <Td colSpan={6}>
+                  <Td colSpan={5}>
                     <Table aria-label={`${ns.name} local queue detail`} variant="compact">
                       <Thead>
                         <Tr>
@@ -134,7 +133,7 @@ const NamespacesPanel: React.FC<NamespacesPanelProps> = ({ namespaces, localQueu
                       <Tbody>
                         {nsLocalQueues.length === 0 ? (
                           <Tr>
-                            <Td colSpan={6} style={{ color: '#6a6e73' }}>
+                            <Td colSpan={5} style={{ color: '#6a6e73' }}>
                               No LocalQueues in this namespace
                             </Td>
                           </Tr>

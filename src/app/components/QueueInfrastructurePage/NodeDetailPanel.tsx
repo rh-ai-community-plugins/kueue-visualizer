@@ -1,10 +1,10 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Card,
   CardHeader,
   CardTitle,
   CardBody,
-  CardFooter,
   Button,
   DescriptionList,
   DescriptionListGroup,
@@ -20,6 +20,7 @@ import {
   Stack,
   StackItem,
   Title,
+  Divider,
 } from '@patternfly/react-core';
 import type { ClusterQueue, LocalQueue, QueueTopologyNode, FlavorUsage } from '../../types/kueue';
 import { parseQuantity } from '../../utils/quantity';
@@ -77,34 +78,61 @@ const ClusterQueueDetail: React.FC<{
   cq: ClusterQueue;
   activeTab: number;
   setActiveTab: (t: number) => void;
-}> = ({ cq, activeTab, setActiveTab }) => (
+}> = ({ cq, activeTab, setActiveTab }) => {
+  const navigate = useNavigate();
+  return (
+  <Stack hasGutter>
+    <StackItem>
+      <Button
+        variant="secondary"
+        onClick={() => navigate(`/kueue/workloads?cq=${encodeURIComponent(cq.metadata.name)}`)}
+      >
+        View workloads →
+      </Button>
+    </StackItem>
+    <StackItem>
   <Tabs activeKey={activeTab} onSelect={(_, k) => setActiveTab(Number(k))}>
     <Tab eventKey={0} title={<TabTitleText>Capacity</TabTitleText>}>
-      <Stack hasGutter style={{ paddingTop: '1rem' }}>
+      <Stack hasGutter style={{ paddingTop: '0.75rem' }}>
+        {/* Workload counts — prominent, scannable */}
         <StackItem>
-          <DescriptionList isCompact>
-            <DescriptionListGroup>
-              <DescriptionListTerm>Admitted</DescriptionListTerm>
-              <DescriptionListDescription>{cq.status?.admittedWorkloads ?? 0}</DescriptionListDescription>
-            </DescriptionListGroup>
-            <DescriptionListGroup>
-              <DescriptionListTerm>Pending</DescriptionListTerm>
-              <DescriptionListDescription>{cq.status?.pendingWorkloads ?? 0}</DescriptionListDescription>
-            </DescriptionListGroup>
-            <DescriptionListGroup>
-              <DescriptionListTerm>Queueing strategy</DescriptionListTerm>
-              <DescriptionListDescription>{cq.spec.queueingStrategy ?? 'BestEffortFIFO'}</DescriptionListDescription>
-            </DescriptionListGroup>
-          </DescriptionList>
+          <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: '0.72em', color: '#6a6e73', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Admitted</div>
+              <div style={{ fontSize: '1.5em', fontWeight: 700, lineHeight: 1.2 }}>{cq.status?.admittedWorkloads ?? 0}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.72em', color: '#6a6e73', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pending</div>
+              <div style={{ fontSize: '1.5em', fontWeight: 700, lineHeight: 1.2, color: (cq.status?.pendingWorkloads ?? 0) > 0 ? '#EC7A08' : 'inherit' }}>
+                {cq.status?.pendingWorkloads ?? 0}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.72em', color: '#6a6e73', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Strategy</div>
+              <div style={{ fontSize: '0.82em', marginTop: '0.2em' }}>{cq.spec.queueingStrategy ?? 'BestEffortFIFO'}</div>
+            </div>
+          </div>
         </StackItem>
-        {(cq.status?.flavorUsage ?? []).map((fu) => (
-          <StackItem key={fu.name}>
-            <strong>{fu.name}</strong>
-            {fu.resources.map((r) => (
-              <UsageBar key={r.name} label={r.name} used={r.total} borrowed={r.borrowed} cq={cq} flavorName={fu.name} />
+        {/* Resource quota utilization */}
+        {(cq.status?.flavorsReservation ?? []).length > 0 ? (
+          <>
+            <StackItem><Divider /></StackItem>
+            {(cq.status?.flavorsReservation ?? []).map((fu) => (
+              <StackItem key={fu.name}>
+                <div style={{ fontSize: '0.78em', color: '#6a6e73', marginBottom: '0.3rem' }}>
+                  Flavor: <strong style={{ color: '#151515' }}>{fu.name}</strong>
+                </div>
+                {fu.resources.map((r) => (
+                  <UsageBar key={r.name} label={r.name} used={r.total} borrowed={r.borrowed} cq={cq} flavorName={fu.name} />
+                ))}
+              </StackItem>
             ))}
+          </>
+        ) : (
+          <StackItem>
+            <span style={{ fontSize: '0.85em', color: '#6a6e73' }}>No active resource reservations.</span>
           </StackItem>
-        ))}
+        )}
       </Stack>
     </Tab>
 
@@ -167,35 +195,55 @@ const ClusterQueueDetail: React.FC<{
       </Stack>
     </Tab>
   </Tabs>
-);
+    </StackItem>
+  </Stack>
+  );
+};
 
 // --- LocalQueue detail ---
 
 const LocalQueueDetail: React.FC<{ lq: LocalQueue; clusterQueues: ClusterQueue[] }> = ({ lq, clusterQueues }) => {
+  const navigate = useNavigate();
   const cq = clusterQueues.find((c) => c.metadata.name === lq.spec.clusterQueue);
   return (
-    <DescriptionList isCompact>
-      <DescriptionListGroup>
-        <DescriptionListTerm>Bound to ClusterQueue</DescriptionListTerm>
-        <DescriptionListDescription>
-          <Label color="red" isCompact>{lq.spec.clusterQueue}</Label>
-        </DescriptionListDescription>
-      </DescriptionListGroup>
-      <DescriptionListGroup>
-        <DescriptionListTerm>Cohort</DescriptionListTerm>
-        <DescriptionListDescription>
-          {cq?.spec.cohort ? <Label color="purple" isCompact>{cq.spec.cohort}</Label> : '—'}
-        </DescriptionListDescription>
-      </DescriptionListGroup>
-      <DescriptionListGroup>
-        <DescriptionListTerm>Admitted workloads</DescriptionListTerm>
-        <DescriptionListDescription>{lq.status?.admittedWorkloads ?? 0}</DescriptionListDescription>
-      </DescriptionListGroup>
-      <DescriptionListGroup>
-        <DescriptionListTerm>Pending workloads</DescriptionListTerm>
-        <DescriptionListDescription>{lq.status?.pendingWorkloads ?? 0}</DescriptionListDescription>
-      </DescriptionListGroup>
-    </DescriptionList>
+    <Stack hasGutter>
+      <StackItem>
+        <Button
+          variant="secondary"
+          onClick={() =>
+            navigate(
+              `/kueue/workloads?ns=${encodeURIComponent(lq.metadata.namespace ?? '')}&queue=${encodeURIComponent(lq.metadata.name)}`,
+            )
+          }
+        >
+          View workloads →
+        </Button>
+      </StackItem>
+      <StackItem>
+        <DescriptionList isCompact>
+          <DescriptionListGroup>
+            <DescriptionListTerm>Bound to ClusterQueue</DescriptionListTerm>
+            <DescriptionListDescription>
+              <Label color="red" isCompact>{lq.spec.clusterQueue}</Label>
+            </DescriptionListDescription>
+          </DescriptionListGroup>
+          <DescriptionListGroup>
+            <DescriptionListTerm>Cohort</DescriptionListTerm>
+            <DescriptionListDescription>
+              {cq?.spec.cohort ? <Label color="purple" isCompact>{cq.spec.cohort}</Label> : '—'}
+            </DescriptionListDescription>
+          </DescriptionListGroup>
+          <DescriptionListGroup>
+            <DescriptionListTerm>Admitted workloads</DescriptionListTerm>
+            <DescriptionListDescription>{lq.status?.admittedWorkloads ?? 0}</DescriptionListDescription>
+          </DescriptionListGroup>
+          <DescriptionListGroup>
+            <DescriptionListTerm>Pending workloads</DescriptionListTerm>
+            <DescriptionListDescription>{lq.status?.pendingWorkloads ?? 0}</DescriptionListDescription>
+          </DescriptionListGroup>
+        </DescriptionList>
+      </StackItem>
+    </Stack>
   );
 };
 

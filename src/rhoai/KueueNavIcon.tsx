@@ -1,6 +1,6 @@
 import React from 'react';
-import { ResourcesFullIcon } from '@patternfly/react-icons';
+import { CogIcon } from '@patternfly/react-icons';
 
-const KueueNavIcon: React.FC = () => <ResourcesFullIcon />;
+const KueueNavIcon: React.FC = () => <CogIcon />;
 
 export default KueueNavIcon;
