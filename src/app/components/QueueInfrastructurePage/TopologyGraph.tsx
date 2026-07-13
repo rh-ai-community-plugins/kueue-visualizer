@@ -92,7 +92,8 @@ const makeShape = (
     const data = element.getData?.() as { pending?: number; utilizationPct?: number } | undefined;
     const pending = opts?.badge ? (data?.pending ?? 0) : 0;
     const utilPct = opts?.utilBar ? (data?.utilizationPct ?? 0) : 0;
-    const fillColor = '#C9190B'; // Always red — matches legend; intensity conveyed by fill width
+    const selected = element.isSelected?.() ?? false;
+    const fillColor = '#C9190B';
     const clipId = `util-clip-${element.getId()}`;
 
     return (
@@ -104,38 +105,31 @@ const makeShape = (
                 <rect x={0} y={0} width={width} height={height} rx={8} />
               </clipPath>
             </defs>
-            {/* Muted background — shows remaining capacity */}
             <rect x={0} y={0} width={width} height={height} rx={8} fill={color} fillOpacity={0.25} stroke="none" />
-            {/* Vibrant fill from left — shows used capacity */}
             {utilPct > 0 && (
               <rect
-                x={0}
-                y={0}
-                width={width * utilPct}
-                height={height}
-                fill={fillColor}
-                fillOpacity={0.8}
-                stroke="none"
-                clipPath={`url(#${clipId})`}
+                x={0} y={0} width={width * utilPct} height={height}
+                fill={fillColor} fillOpacity={0.8} stroke="none" clipPath={`url(#${clipId})`}
               />
             )}
-            {/* Border */}
             <rect x={0} y={0} width={width} height={height} rx={8} fill="none" stroke={color} strokeWidth={1.5} strokeOpacity={0.5} />
           </>
         ) : (
           <rect x={0} y={0} width={width} height={height} rx={8} fill={color} stroke="none" />
         )}
+        {/* Selection ring — white halo + colored border */}
+        {selected && (
+          <>
+            <rect x={-4} y={-4} width={width + 8} height={height + 8} rx={11} fill="none" stroke="white" strokeWidth={4} />
+            <rect x={-4} y={-4} width={width + 8} height={height + 8} rx={11} fill="none" stroke={color} strokeWidth={2.5} />
+          </>
+        )}
         {pending > 0 && (
           <>
             <circle cx={width - 10} cy={10} r={9} fill="#EC7A08" stroke="white" strokeWidth={1.5} />
             <text
-              x={width - 10}
-              y={10}
-              textAnchor="middle"
-              dominantBaseline="central"
-              fill="white"
-              fontSize={pending > 99 ? 7 : 9}
-              fontWeight="bold"
+              x={width - 10} y={10} textAnchor="middle" dominantBaseline="central"
+              fill="white" fontSize={pending > 99 ? 7 : 9} fontWeight="bold"
               style={{ userSelect: 'none' }}
             >
               {pending > 99 ? '99+' : pending}
@@ -167,8 +161,9 @@ const PlainEdge: React.FC<EdgeProps> = (props) => <DefaultEdge {...props} />;
 const BorrowingEdge: React.FC<EdgeProps> = (props) => {
   const { element } = props;
   const label = (element.getData?.() as { label?: string } | undefined)?.label ?? '';
-  const startPoint = element.getStartPoint();
-  const endPoint = element.getEndPoint();
+  const startPoint = element.getStartPoint?.();
+  const endPoint = element.getEndPoint?.();
+  if (!startPoint || !endPoint) return null;
   const bendpoints = element.getBendpoints?.() ?? [];
   const allPoints = [startPoint, ...bendpoints, endPoint];
 
@@ -197,21 +192,13 @@ const BorrowingEdge: React.FC<EdgeProps> = (props) => {
 
   return (
     <g>
-      {/* DefaultEdge hidden but present for click/selection handling */}
-      <g style={{ opacity: 0 }}>
-        <DefaultEdge {...props} />
-      </g>
       {/* Orange edge line */}
-      <path d={pathD} stroke="#EC7A08" strokeWidth={2.5} fill="none" style={{ pointerEvents: 'none' }} />
-      {/* Inline arrowhead */}
-      <polygon
-        points={`${tip.x},${tip.y} ${left.x},${left.y} ${right.x},${right.y}`}
-        fill="#EC7A08"
-        style={{ pointerEvents: 'none' }}
-      />
+      <path d={pathD} stroke="#EC7A08" strokeWidth={2.5} fill="none" />
+      {/* Inline arrowhead polygon */}
+      <polygon points={`${tip.x},${tip.y} ${left.x},${left.y} ${right.x},${right.y}`} fill="#EC7A08" />
       {/* Pill label centered on longest segment */}
       {label && (
-        <g transform={`translate(${midX}, ${midY})`} style={{ pointerEvents: 'none' }}>
+        <g transform={`translate(${midX}, ${midY})`}>
           <rect x={-34} y={-9} width={68} height={18} rx={9} fill="#EC7A08" />
           <text textAnchor="middle" dominantBaseline="central" fill="white" fontSize={10} fontWeight="bold">
             {label}
