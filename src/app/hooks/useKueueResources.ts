@@ -265,7 +265,12 @@ export function computeWorkloadQueueInfo(
       const wPriority = w.spec.priority ?? 0;
       const thisPriority = workload.spec.priority ?? 0;
       if (wPriority !== thisPriority) return wPriority > thisPriority;
-      return new Date(w.metadata.creationTimestamp) < new Date(workload.metadata.creationTimestamp);
+      const tDiff =
+        new Date(w.metadata.creationTimestamp).getTime() -
+        new Date(workload.metadata.creationTimestamp).getTime();
+      if (tDiff !== 0) return tDiff < 0;
+      // Stable tiebreaker when timestamps are equal (K8s timestamps are second-resolution)
+      return w.metadata.name < workload.metadata.name;
     }).length;
     queuePosition = workloadsAhead + 1;
   }

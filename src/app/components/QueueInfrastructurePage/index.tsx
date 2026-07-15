@@ -144,7 +144,7 @@ const QueueInfrastructurePage: React.FC = () => {
                 />
               </SplitItem>
               {selectedNode && (
-                <SplitItem style={{ width: '380px', minWidth: '380px' }}>
+                <SplitItem style={{ width: '380px', minWidth: '380px', maxHeight: '520px', overflowY: 'auto' }}>
                   <NodeDetailPanel
                     node={selectedNode}
                     clusterQueues={clusterQueues}

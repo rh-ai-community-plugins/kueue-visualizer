@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { observer } from 'mobx-react';
 import {
   Visualization,
   VisualizationProvider,
@@ -44,21 +45,104 @@ const NODE_COLORS: Record<string, string> = {
   [NODE_FLAVOR]: '#3E8635',
 };
 
-// Compute highest utilization % across all resources in a ClusterQueue (0–1).
-function computeCQUtilization(cq: ClusterQueue): number {
-  let maxPct = 0;
+// Compute scheduled fraction (own workloads / nominal) for the most-saturated resource in a CQ.
+function computeCQScheduledPct(cq: ClusterQueue): number {
+  let best = 0;
   for (const rg of cq.spec.resourceGroups ?? []) {
     for (const flavorSpec of rg.flavors) {
-      const flavorUsage = (cq.status?.flavorsReservation ?? []).find((fu) => fu.name === flavorSpec.name);
+      const flavorUsage = cq.status?.flavorsReservation?.find((fu) => fu.name === flavorSpec.name);
       for (const resSpec of flavorSpec.resources) {
         const quota = parseQuantity(resSpec.nominalQuota);
         if (quota <= 0) continue;
-        const used = parseQuantity(
-          flavorUsage?.resources.find((r) => r.name === resSpec.name)?.total ?? '0',
-        );
-        maxPct = Math.max(maxPct, used / quota);
+        const resUsage = flavorUsage?.resources.find((r) => r.name === resSpec.name);
+        const totalUsed = parseQuantity(resUsage?.total ?? '0');
+        const borrowed = parseQuantity(resUsage?.borrowed ?? '0');
+        const ownUsed = Math.max(0, totalUsed - borrowed);
+        best = Math.max(best, Math.min(1, ownUsed / quota));
       }
     }
+  }
+  return best;
+}
+
+// Per-flavor::resource cohort lending pool snapshot.
+// contribution_i = min(spare_i, lendingLimit_i); totalBorrowed = sum of all members' borrowed.
+type CohortPool = Map<string, { totalPool: number; totalBorrowed: number }>;
+
+function buildCohortPool(cohortName: string, cqs: ClusterQueue[]): CohortPool {
+  const pool: CohortPool = new Map();
+  for (const cq of cqs.filter((q) => q.spec.cohort === cohortName)) {
+    for (const rg of cq.spec.resourceGroups ?? []) {
+      for (const fl of rg.flavors) {
+        for (const res of fl.resources) {
+          const key = `${fl.name}::${res.name}`;
+          const quota = parseQuantity(res.nominalQuota);
+          const lendingLimit = res.lendingLimit ? parseQuantity(res.lendingLimit) : 0;
+          const fu = cq.status?.flavorsReservation?.find((f) => f.name === fl.name);
+          const ru = fu?.resources.find((r) => r.name === res.name);
+          const ownUsed = Math.max(0, parseQuantity(ru?.total ?? '0') - parseQuantity(ru?.borrowed ?? '0'));
+          const contribution = Math.min(Math.max(0, quota - ownUsed), lendingLimit);
+          const borrowed = parseQuantity(ru?.borrowed ?? '0');
+          const prev = pool.get(key) ?? { totalPool: 0, totalBorrowed: 0 };
+          pool.set(key, { totalPool: prev.totalPool + contribution, totalBorrowed: prev.totalBorrowed + borrowed });
+        }
+      }
+    }
+  }
+  return pool;
+}
+
+// Compute the fraction of this CQ's nominal that is actually being lent right now.
+// Only non-zero when siblings are actively borrowing. Distributed proportionally by contribution.
+function computeCQLentPct(cq: ClusterQueue, pool: CohortPool): number {
+  let best = 0;
+  for (const rg of cq.spec.resourceGroups ?? []) {
+    for (const fl of rg.flavors) {
+      for (const res of fl.resources) {
+        const key = `${fl.name}::${res.name}`;
+        const quota = parseQuantity(res.nominalQuota);
+        if (quota <= 0) continue;
+        const lendingLimit = res.lendingLimit ? parseQuantity(res.lendingLimit) : 0;
+        if (lendingLimit <= 0) continue;
+        const { totalPool, totalBorrowed } = pool.get(key) ?? { totalPool: 0, totalBorrowed: 0 };
+        if (totalBorrowed <= 0) continue; // nobody is borrowing — no green bar
+        const fu = cq.status?.flavorsReservation?.find((f) => f.name === fl.name);
+        const ru = fu?.resources.find((r) => r.name === res.name);
+        const ownUsed = Math.max(0, parseQuantity(ru?.total ?? '0') - parseQuantity(ru?.borrowed ?? '0'));
+        const contribution = Math.min(Math.max(0, quota - ownUsed), lendingLimit);
+        const actuallyLent = totalPool > 0 ? contribution * (totalBorrowed / totalPool) : 0;
+        best = Math.max(best, actuallyLent / quota);
+      }
+    }
+  }
+  return Math.min(best, 1);
+}
+
+// Compute cohort utilization using per-(flavor::resource) ratio, then take the max.
+// Same approach as CQ bars — avoids mixing CPU and memory units in a single sum.
+function computeCohortUtilization(cohortName: string, cqs: ClusterQueue[]): number {
+  const members = cqs.filter((q) => q.spec.cohort === cohortName);
+  const nominalMap = new Map<string, number>();
+  const usedMap = new Map<string, number>();
+  for (const cq of members) {
+    for (const rg of cq.spec.resourceGroups ?? []) {
+      for (const fl of rg.flavors) {
+        for (const res of fl.resources) {
+          const key = `${fl.name}::${res.name}`;
+          nominalMap.set(key, (nominalMap.get(key) ?? 0) + parseQuantity(res.nominalQuota));
+        }
+      }
+    }
+    for (const fu of cq.status?.flavorsReservation ?? []) {
+      for (const res of fu.resources) {
+        const key = `${fu.name}::${res.name}`;
+        usedMap.set(key, (usedMap.get(key) ?? 0) + parseQuantity(res.total ?? '0'));
+      }
+    }
+  }
+  let maxPct = 0;
+  for (const [key, nominal] of nominalMap) {
+    if (nominal > 0) maxPct = Math.max(maxPct, (usedMap.get(key) ?? 0) / nominal);
   }
   return Math.min(maxPct, 1);
 }
@@ -82,18 +166,25 @@ function computeBorrowingLabel(cq: ClusterQueue): string | undefined {
   return `↗ ${parts.slice(0, 2).join(', ')}${parts.length > 2 ? '…' : ''}`;
 }
 
-// Build a colored shape that optionally shows a pending badge and a fill-from-left utilization background.
+// Build a colored shape with optional utilization bar, pending badge, and label rendered inside.
+// Rendering the label inside the shape (instead of relying on DefaultNode's external label)
+// gives consistent appearance regardless of hover/selection state.
 const makeShape = (
   color: string,
   opts?: { badge?: boolean; utilBar?: boolean },
 ): React.FC<ShapeProps> => {
-  const Shape: React.FC<ShapeProps> = ({ width, height, element }) => {
+  const Shape: React.FC<ShapeProps> = observer(({ width, height, element }) => {
     useAnchor((el: Node) => new RectAnchor(el));
-    const data = element.getData?.() as { pending?: number; utilizationPct?: number } | undefined;
+    const data = element.getData?.() as { pending?: number; scheduledPct?: number; lentPct?: number; utilizationPct?: number } | undefined;
     const pending = opts?.badge ? (data?.pending ?? 0) : 0;
-    const utilPct = opts?.utilBar ? (data?.utilizationPct ?? 0) : 0;
+    // scheduledPct = own workloads; lentPct = lent to cohort pool; utilizationPct = simple single value (cohort)
+    const scheduledPct = opts?.utilBar ? (data?.scheduledPct ?? data?.utilizationPct ?? 0) : 0;
+    const lentPct = opts?.utilBar ? (data?.lentPct ?? 0) : 0;
     const selected = element.isSelected?.() ?? false;
-    const fillColor = '#C9190B';
+    const rawLabel = element.getLabel?.() ?? '';
+    // Truncate label to fit inside the node box (~6.6px per char at font-size 11)
+    const maxChars = Math.max(4, Math.floor((width - 16) / 6.6));
+    const displayLabel = rawLabel.length > maxChars ? rawLabel.slice(0, maxChars - 1) + '…' : rawLabel;
     const clipId = `util-clip-${element.getId()}`;
 
     return (
@@ -105,18 +196,40 @@ const makeShape = (
                 <rect x={0} y={0} width={width} height={height} rx={8} />
               </clipPath>
             </defs>
-            <rect x={0} y={0} width={width} height={height} rx={8} fill={color} fillOpacity={0.25} stroke="none" />
-            {utilPct > 0 && (
-              <rect
-                x={0} y={0} width={width * utilPct} height={height}
-                fill={fillColor} fillOpacity={0.8} stroke="none" clipPath={`url(#${clipId})`}
-              />
+            {/* Base background — moderate opacity so label stays readable even at 0% fill */}
+            <rect x={0} y={0} width={width} height={height} rx={8} fill={color} fillOpacity={0.45} stroke="none" />
+            {/* Scheduled segment */}
+            {scheduledPct > 0 && (
+              <rect x={0} y={0} width={width * scheduledPct} height={height}
+                fill={color} fillOpacity={0.95} stroke="none" clipPath={`url(#${clipId})`} />
             )}
-            <rect x={0} y={0} width={width} height={height} rx={8} fill="none" stroke={color} strokeWidth={1.5} strokeOpacity={0.5} />
+            {/* Lent-to-cohort segment (green) */}
+            {lentPct > 0 && (
+              <rect x={width * scheduledPct} y={0} width={width * lentPct} height={height}
+                fill="#3E8635" fillOpacity={0.95} stroke="none" clipPath={`url(#${clipId})`} />
+            )}
+            {/* Border */}
+            <rect x={0} y={0} width={width} height={height} rx={8} fill="none" stroke={color} strokeWidth={1.5} strokeOpacity={0.6} />
           </>
         ) : (
           <rect x={0} y={0} width={width} height={height} rx={8} fill={color} stroke="none" />
         )}
+        {/* Label rendered inside the shape — avoids DefaultNode's hover-sensitive label background */}
+        <text
+          x={width / 2}
+          y={height / 2}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill="white"
+          stroke="rgba(0,0,0,0.35)"
+          strokeWidth={0.4}
+          paintOrder="stroke"
+          fontSize={11}
+          fontWeight={selected ? 700 : 500}
+          style={{ userSelect: 'none', pointerEvents: 'none' }}
+        >
+          {displayLabel}
+        </text>
         {/* Selection ring — white halo + colored border */}
         {selected && (
           <>
@@ -124,6 +237,7 @@ const makeShape = (
             <rect x={-4} y={-4} width={width + 8} height={height + 8} rx={11} fill="none" stroke={color} strokeWidth={2.5} />
           </>
         )}
+        {/* Pending badge */}
         {pending > 0 && (
           <>
             <circle cx={width - 10} cy={10} r={9} fill="#EC7A08" stroke="white" strokeWidth={1.5} />
@@ -138,7 +252,7 @@ const makeShape = (
         )}
       </g>
     );
-  };
+  });
   return Shape;
 };
 
@@ -147,7 +261,7 @@ const SHAPE_BY_KIND: Record<string, React.FC<ShapeProps>> = {
   [NODE_NAMESPACE]: makeShape(NODE_COLORS[NODE_NAMESPACE]),
   [NODE_LOCAL_QUEUE]: makeShape(NODE_COLORS[NODE_LOCAL_QUEUE], { badge: true }),
   [NODE_CLUSTER_QUEUE]: makeShape(NODE_COLORS[NODE_CLUSTER_QUEUE], { badge: true, utilBar: true }),
-  [NODE_COHORT]: makeShape(NODE_COLORS[NODE_COHORT]),
+  [NODE_COHORT]: makeShape(NODE_COLORS[NODE_COHORT], { utilBar: true }),
   [NODE_FLAVOR]: makeShape(NODE_COLORS[NODE_FLAVOR]),
 };
 
@@ -158,7 +272,7 @@ const getCustomShape = (element: Node): React.FC<ShapeProps> =>
 const PlainEdge: React.FC<EdgeProps> = (props) => <DefaultEdge {...props} />;
 
 // Borrowing edge — draws an orange SVG path + inline arrowhead + pill label.
-const BorrowingEdge: React.FC<EdgeProps> = (props) => {
+const BorrowingEdge: React.FC<EdgeProps> = observer((props) => {
   const { element } = props;
   const label = (element.getData?.() as { label?: string } | undefined)?.label ?? '';
   const startPoint = element.getStartPoint?.();
@@ -207,15 +321,17 @@ const BorrowingEdge: React.FC<EdgeProps> = (props) => {
       )}
     </g>
   );
-};
+});
 
 // Component factory — stable module-level reference.
 const componentFactory: ComponentFactory = (kind, type) => {
   if (kind === ModelKind.graph) return withPanZoom({ zoomMin: 0.001 })(GraphComponent);
   if (kind === ModelKind.node) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // showLabel={false}: label is rendered inside the custom Shape to avoid DefaultNode's
+    // hover-sensitive label background that causes unclicked nodes to appear larger than clicked ones.
     return withSelection()((props: any) => (
-      <DefaultNode {...props} truncateLength={22} getCustomShape={getCustomShape} showLabel />
+      <DefaultNode {...props} truncateLength={100} getCustomShape={getCustomShape} showLabel={false} />
     ));
   }
   if (kind === ModelKind.edge) {
@@ -297,8 +413,9 @@ const TopologyLegend: React.FC = () => {
             </div>
           ))}
           <div style={{ color: '#6a6e73', borderTop: '1px solid #d2d2d2', paddingTop: 6, marginTop: 2 }}>
-            Orange badge = pending workloads.
-            ClusterQueue background fills left→right showing quota used (light red = empty, dark red = full).{' '}
+            Orange badge = pending workloads. Fill shows utilization:{' '}
+            <span style={{ color: '#C9190B', fontWeight: 600 }}>■</span> scheduled,{' '}
+            <span style={{ color: '#3E8635', fontWeight: 600 }}>■</span> lent to cohort pool.{' '}
             <strong>↗</strong> = active borrowing.
           </div>
         </div>
@@ -384,14 +501,22 @@ const TopologyGraphInner: React.FC<TopologyGraphProps> = ({
         shape: NodeShape.hexagon,
         width: 130,
         height: 55,
-        data: { kind: NODE_COHORT, name },
+        data: { kind: NODE_COHORT, name, utilizationPct: computeCohortUtilization(name, visibleCQs) },
       });
+    }
+
+    // Pre-compute cohort lending pools (needed for accurate lentPct per CQ).
+    const cohortPoolCache = new Map<string, CohortPool>();
+    for (const name of cohortNames) {
+      cohortPoolCache.set(name, buildCohortPool(name, visibleCQs));
     }
 
     // ClusterQueue nodes + edges to cohorts and flavors
     for (const cq of visibleCQs) {
       const cqId = `cq:${cq.metadata.name}`;
-      const utilizationPct = computeCQUtilization(cq);
+      const scheduledPct = computeCQScheduledPct(cq);
+      const pool = cq.spec.cohort ? (cohortPoolCache.get(cq.spec.cohort) ?? new Map()) : new Map<string, {totalPool:number;totalBorrowed:number}>();
+      const lentPct = computeCQLentPct(cq, pool);
       nodes.push({
         id: cqId,
         type: NODE_CLUSTER_QUEUE,
@@ -404,7 +529,8 @@ const TopologyGraphInner: React.FC<TopologyGraphProps> = ({
           name: cq.metadata.name,
           resource: cq,
           pending: cq.status?.pendingWorkloads ?? 0,
-          utilizationPct,
+          scheduledPct,
+          lentPct,
         },
       });
 
