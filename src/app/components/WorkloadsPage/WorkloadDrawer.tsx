@@ -146,7 +146,8 @@ const WorkloadDrawer: React.FC<WorkloadDrawerProps> = ({
                       ) : workload.spec.priorityClassName ?? '—'}
                     </DescriptionListDescription>
                   </DescriptionListGroup>
-                </DescriptionList>
+                    <ResourcesRequested workload={workload} />
+              </DescriptionList>
               </StackItem>
 
               {/* Why pending? */}
@@ -203,6 +204,49 @@ const WorkloadDrawer: React.FC<WorkloadDrawerProps> = ({
 
             </Stack>
     </DrawerPanelContent>
+  );
+};
+
+// --- Resources Requested ---
+
+// Returns DescriptionListGroup elements to sit flat inside the parent DescriptionList.
+const ResourcesRequested: React.FC<{ workload: Workload }> = ({ workload }) => {
+  const podSets = workload.spec.podSets ?? [];
+  if (podSets.length === 0) return null;
+
+  return (
+    <>
+      {podSets.map((ps) => {
+        const merged: Record<string, string> = {};
+        for (const c of ps.template.spec.containers) {
+          for (const [res, qty] of Object.entries(c.resources?.requests ?? {})) {
+            merged[res] = qty;
+          }
+        }
+        const entries = Object.entries(merged);
+        const label = podSets.length > 1
+          ? `Resources (${ps.name}${ps.count > 1 ? ` ×${ps.count}` : ''})`
+          : ps.count > 1 ? `Resources (×${ps.count})` : 'Resources';
+        return (
+          <DescriptionListGroup key={ps.name}>
+            <DescriptionListTerm>{label}</DescriptionListTerm>
+            <DescriptionListDescription>
+              {entries.length === 0 ? (
+                <span style={{ color: '#6a6e73' }}>—</span>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                  {entries.map(([res, qty]) => (
+                    <Label key={res} color="grey" isCompact>
+                      {res}: <strong style={{ marginLeft: 3 }}>{qty}</strong>
+                    </Label>
+                  ))}
+                </div>
+              )}
+            </DescriptionListDescription>
+          </DescriptionListGroup>
+        );
+      })}
+    </>
   );
 };
 

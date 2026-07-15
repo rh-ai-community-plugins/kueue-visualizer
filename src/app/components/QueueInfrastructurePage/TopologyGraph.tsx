@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { observer } from 'mobx-react';
+import { observable, action } from 'mobx';
 import {
   Visualization,
   VisualizationProvider,
@@ -30,6 +31,14 @@ import {
 import type { ShapeProps, NodeModel, EdgeModel, EdgeProps } from '@patternfly/react-topology';
 import type { ClusterQueue, LocalQueue, QueueTopologyNode } from '../../types/kueue';
 import { parseQuantity } from '../../utils/quantity';
+
+// Module-level MobX observable for selection state.
+// Using this instead of relying on withSelection() → ShapeProps because:
+// - VisualizationSurface `state` prop only syncs to controller on mount (not on updates)
+// - DefaultNode may not always forward `selected` to custom shapes via getCustomShape
+// - observer() Shapes that read selectionStore.selectedId will re-render automatically
+const selectionStore = observable({ selectedId: null as string | null });
+const setSelectedId = action((id: string | null) => { selectionStore.selectedId = id; });
 
 const NODE_NAMESPACE = 'Namespace';
 const NODE_LOCAL_QUEUE = 'LocalQueue';
@@ -175,12 +184,13 @@ const makeShape = (
 ): React.FC<ShapeProps> => {
   const Shape: React.FC<ShapeProps> = observer(({ width, height, element }) => {
     useAnchor((el: Node) => new RectAnchor(el));
+    // Read selection from module-level MobX observable — guaranteed to re-render on change.
+    const selected = selectionStore.selectedId === element.getId();
     const data = element.getData?.() as { pending?: number; scheduledPct?: number; lentPct?: number; utilizationPct?: number } | undefined;
     const pending = opts?.badge ? (data?.pending ?? 0) : 0;
     // scheduledPct = own workloads; lentPct = lent to cohort pool; utilizationPct = simple single value (cohort)
     const scheduledPct = opts?.utilBar ? (data?.scheduledPct ?? data?.utilizationPct ?? 0) : 0;
     const lentPct = opts?.utilBar ? (data?.lentPct ?? 0) : 0;
-    const selected = element.isSelected?.() ?? false;
     const rawLabel = element.getLabel?.() ?? '';
     // Truncate label to fit inside the node box (~6.6px per char at font-size 11)
     const maxChars = Math.max(4, Math.floor((width - 16) / 6.6));
@@ -230,11 +240,11 @@ const makeShape = (
         >
           {displayLabel}
         </text>
-        {/* Selection ring — white halo + colored border */}
+        {/* Selection ring: bright white border on the node edge, colored inset ring just inside */}
         {selected && (
           <>
-            <rect x={-4} y={-4} width={width + 8} height={height + 8} rx={11} fill="none" stroke="white" strokeWidth={4} />
-            <rect x={-4} y={-4} width={width + 8} height={height + 8} rx={11} fill="none" stroke={color} strokeWidth={2.5} />
+            <rect x={0} y={0} width={width} height={height} rx={8} fill="none" stroke="white" strokeWidth={5} />
+            <rect x={3} y={3} width={width - 6} height={height - 6} rx={5} fill="none" stroke={color} strokeWidth={2} strokeOpacity={1} />
           </>
         )}
         {/* Pending badge */}
@@ -323,17 +333,18 @@ const BorrowingEdge: React.FC<EdgeProps> = observer((props) => {
   );
 });
 
-// Component factory — stable module-level reference.
+// IMPORTANT: This MUST be a stable module-level constant, not created inside componentFactory.
+// PF topology calls componentFactory on every render cycle. If withSelection()() were called
+// inline inside the factory, React would see a new component type on each render, unmount the
+// old instance, and mount a fresh one — resetting selected=false every frame.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const TopologyNodeComponent = withSelection()((props: any) => (
+  <DefaultNode {...props} truncateLength={100} getCustomShape={getCustomShape} showLabel={false} />
+));
+
 const componentFactory: ComponentFactory = (kind, type) => {
   if (kind === ModelKind.graph) return withPanZoom({ zoomMin: 0.001 })(GraphComponent);
-  if (kind === ModelKind.node) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    // showLabel={false}: label is rendered inside the custom Shape to avoid DefaultNode's
-    // hover-sensitive label background that causes unclicked nodes to appear larger than clicked ones.
-    return withSelection()((props: any) => (
-      <DefaultNode {...props} truncateLength={100} getCustomShape={getCustomShape} showLabel={false} />
-    ));
-  }
+  if (kind === ModelKind.node) return TopologyNodeComponent;
   if (kind === ModelKind.edge) {
     if (type === 'edge-borrow') return BorrowingEdge;
     return PlainEdge;
@@ -460,11 +471,12 @@ const TopologyGraphInner: React.FC<TopologyGraphProps> = ({
 
   useEffect(() => {
     const handler = (ids: string[]) => {
-      if (!ids || ids.length === 0) { onNodeSelect(null); return; }
+      if (!ids || ids.length === 0) { setSelectedId(null); onNodeSelect(null); return; }
       const element = controller.getElementById(ids[0]);
-      if (!element || element.getKind() === ModelKind.graph) { onNodeSelect(null); return; }
+      if (!element || element.getKind() === ModelKind.graph) { setSelectedId(null); onNodeSelect(null); return; }
       const data = element.getData?.();
       if (!data) return;
+      setSelectedId(element.getId());
       onNodeSelect({
         id: element.getId(),
         kind: data.kind,
