@@ -1,28 +1,23 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useK8sResources } from './useK8sResources';
 import type {
   ClusterQueue,
   LocalQueue,
   ResourceFlavor,
   Workload,
-  KubernetesList,
   WorkloadQueueInfo,
   WorkloadPhase,
   FlavorUsage,
   KueueNamespace,
 } from '../types/kueue';
 
-const KUEUE_API = '/api/k8s/apis/kueue.x-k8s.io/v1beta1';
-const CORE_API = '/api/k8s/api/v1';
-const APPS_API = '/api/k8s/apis/apps/v1';
+// Paths passed to useK8sResources — no /api/k8s prefix (the hook adds it)
+const KUEUE_BASE = '/apis/kueue.x-k8s.io/v1beta1';
+const CORE_BASE = '/api/v1';
+const APPS_BASE = '/apis/apps/v1';
 
-async function fetchKueue<T>(path: string): Promise<T[]> {
-  const res = await fetch(`${KUEUE_API}${path}`);
-  if (!res.ok) {
-    throw new Error(`Failed to fetch ${path}: ${res.status} ${res.statusText}`);
-  }
-  const list: KubernetesList<T> = await res.json();
-  return list.items ?? [];
-}
+// Full prefix for direct fetch() calls (resolveTopOwner, useKueueNamespaces)
+const K8S = '/api/k8s';
 
 // --- Auto-refresh ---
 
@@ -38,78 +33,32 @@ export function useInterval(callback: () => void, delayMs: number): void {
 // --- Individual resource hooks ---
 
 export function useClusterQueues() {
-  const [clusterQueues, setClusterQueues] = useState<ClusterQueue[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const refresh = useCallback(() => {
-    setLoading(true);
-    fetchKueue<ClusterQueue>('/clusterqueues')
-      .then((items) => { setClusterQueues(items); setLoading(false); })
-      .catch((e: Error) => { setError(e.message); setLoading(false); });
-  }, []);
-
-  useEffect(() => { refresh(); }, [refresh]);
-
+  const { items: clusterQueues, loading, error, refresh } =
+    useK8sResources<ClusterQueue>(`${KUEUE_BASE}/clusterqueues`);
   return { clusterQueues, loading, error, refresh };
 }
 
 export function useLocalQueues(namespace?: string) {
-  const [localQueues, setLocalQueues] = useState<LocalQueue[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   const path = namespace
-    ? `/namespaces/${namespace}/localqueues`
-    : '/localqueues';
-
-  const refresh = useCallback(() => {
-    setLoading(true);
-    fetchKueue<LocalQueue>(path)
-      .then((items) => { setLocalQueues(items); setLoading(false); })
-      .catch((e: Error) => { setError(e.message); setLoading(false); });
-  }, [path]);
-
-  useEffect(() => { refresh(); }, [refresh]);
-
+    ? `${KUEUE_BASE}/namespaces/${namespace}/localqueues`
+    : `${KUEUE_BASE}/localqueues`;
+  const { items: localQueues, loading, error, refresh } =
+    useK8sResources<LocalQueue>(path);
   return { localQueues, loading, error, refresh };
 }
 
 export function useResourceFlavors() {
-  const [flavors, setFlavors] = useState<ResourceFlavor[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const refresh = useCallback(() => {
-    setLoading(true);
-    fetchKueue<ResourceFlavor>('/resourceflavors')
-      .then((items) => { setFlavors(items); setLoading(false); })
-      .catch((e: Error) => { setError(e.message); setLoading(false); });
-  }, []);
-
-  useEffect(() => { refresh(); }, [refresh]);
-
+  const { items: flavors, loading, error, refresh } =
+    useK8sResources<ResourceFlavor>(`${KUEUE_BASE}/resourceflavors`);
   return { flavors, loading, error, refresh };
 }
 
 export function useWorkloads(namespace?: string) {
-  const [workloads, setWorkloads] = useState<Workload[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   const path = namespace
-    ? `/namespaces/${namespace}/workloads`
-    : '/workloads';
-
-  const refresh = useCallback(() => {
-    setLoading(true);
-    fetchKueue<Workload>(path)
-      .then((items) => { setWorkloads(items); setLoading(false); })
-      .catch((e: Error) => { setError(e.message); setLoading(false); });
-  }, [path]);
-
-  useEffect(() => { refresh(); }, [refresh]);
-
+    ? `${KUEUE_BASE}/namespaces/${namespace}/workloads`
+    : `${KUEUE_BASE}/workloads`;
+  const { items: workloads, loading, error, refresh } =
+    useK8sResources<Workload>(path);
   return { workloads, loading, error, refresh };
 }
 
@@ -117,13 +66,18 @@ export function useKueueNamespaces() {
   const [namespaces, setNamespaces] = useState<KueueNamespace[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const controllerRef = useRef<AbortController | null>(null);
 
   const refresh = useCallback(() => {
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
+
     setLoading(true);
-    // Fetch namespaces matching either Kueue managed label
+    setError(null);
     Promise.all([
-      fetch(`${CORE_API}/namespaces?labelSelector=kueue-managed%3Dtrue`).then((r) => r.json()),
-      fetch(`${CORE_API}/namespaces?labelSelector=kueue.openshift.io%2Fmanaged%3Dtrue`).then((r) => r.json()),
+      fetch(`${K8S}${CORE_BASE}/namespaces?labelSelector=kueue-managed%3Dtrue`, { signal: controller.signal }).then((r) => r.json()),
+      fetch(`${K8S}${CORE_BASE}/namespaces?labelSelector=kueue.openshift.io%2Fmanaged%3Dtrue`, { signal: controller.signal }).then((r) => r.json()),
     ])
       .then(([res1, res2]) => {
         const seen = new Set<string>();
@@ -140,10 +94,17 @@ export function useKueueNamespaces() {
         setNamespaces(merged);
         setLoading(false);
       })
-      .catch((e: Error) => { setError(e.message); setLoading(false); });
+      .catch((e: Error) => {
+        if (e.name === 'AbortError') return;
+        setError(e.message);
+        setLoading(false);
+      });
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    refresh();
+    return () => controllerRef.current?.abort();
+  }, [refresh]);
 
   return { namespaces, loading, error, refresh };
 }
@@ -156,13 +117,13 @@ export function useKueueNamespaces() {
 // Known intermediate K8s resources and their API paths. Anything not listed (CRDs etc.)
 // is considered a "user-facing" top-level resource and stops the traversal.
 const TRAVERSABLE_PATHS: Record<string, string> = {
-  Pod:        '/api/k8s/api/v1/namespaces/{ns}/pods/{name}',
-  ReplicaSet: `${APPS_API}/namespaces/{ns}/replicasets/{name}`,
-  Deployment: `${APPS_API}/namespaces/{ns}/deployments/{name}`,
-  StatefulSet:`${APPS_API}/namespaces/{ns}/statefulsets/{name}`,
-  DaemonSet:  `${APPS_API}/namespaces/{ns}/daemonsets/{name}`,
-  Job:        '/api/k8s/apis/batch/v1/namespaces/{ns}/jobs/{name}',
-  CronJob:    '/api/k8s/apis/batch/v1/namespaces/{ns}/cronjobs/{name}',
+  Pod:        `${K8S}${CORE_BASE}/namespaces/{ns}/pods/{name}`,
+  ReplicaSet: `${K8S}${APPS_BASE}/namespaces/{ns}/replicasets/{name}`,
+  Deployment: `${K8S}${APPS_BASE}/namespaces/{ns}/deployments/{name}`,
+  StatefulSet:`${K8S}${APPS_BASE}/namespaces/{ns}/statefulsets/{name}`,
+  DaemonSet:  `${K8S}${APPS_BASE}/namespaces/{ns}/daemonsets/{name}`,
+  Job:        `${K8S}/apis/batch/v1/namespaces/{ns}/jobs/{name}`,
+  CronJob:    `${K8S}/apis/batch/v1/namespaces/{ns}/cronjobs/{name}`,
 };
 
 async function resolveTopOwner(
