@@ -13,9 +13,6 @@ import {
   SelectOption,
   SelectList,
   MenuToggle,
-  Toolbar,
-  ToolbarContent,
-  ToolbarItem,
   SearchInput,
   Divider,
 } from '@patternfly/react-core';
@@ -24,26 +21,52 @@ import {
   useLocalQueues,
   useResourceFlavors,
   useKueueNamespaces,
+  useInterval,
 } from '../../hooks/useKueueResources';
+import { useLastSelectedProject } from '../../hooks/useLastSelectedProject';
+import { ProjectSelector } from '../ProjectSelector';
 import TopologyGraph from './TopologyGraph';
 import NodeDetailPanel from './NodeDetailPanel';
 import CohortLedger from './CohortLedger';
 import NamespacesPanel from './NamespacesPanel';
-import type { QueueTopologyNode, LocalQueue } from '../../types/kueue';
+import type { QueueTopologyNode, LocalQueue, ClusterQueue } from '../../types/kueue';
+
+const REFRESH_INTERVAL_MS = 30_000;
 
 const QueueInfrastructurePage: React.FC = () => {
   const [searchParams] = useSearchParams();
 
-  const { clusterQueues, loading: cqLoading, error: cqError } = useClusterQueues();
-  const { localQueues, loading: lqLoading, error: lqError } = useLocalQueues();
-  const { flavors, loading: flLoading, error: flError } = useResourceFlavors();
-  const { namespaces, loading: nsLoading, error: nsError } = useKueueNamespaces();
+  const { clusterQueues, loading: cqLoading, error: cqError, refresh: refreshCQ } = useClusterQueues();
+  const { localQueues, loading: lqLoading, error: lqError, refresh: refreshLQ } = useLocalQueues();
+  const { loading: flLoading, error: flError, refresh: refreshFl } = useResourceFlavors();
+  const { namespaces, loading: nsLoading, error: nsError, refresh: refreshNs } = useKueueNamespaces();
+
+  // Shared project selection — persisted to localStorage key 'rhoai.last-selected-project'
+  // so selection is remembered when navigating between Infrastructure and Workloads pages.
+  const [selectedProject, setSelectedProject] = useLastSelectedProject();
+  const filterNamespace = selectedProject ?? '';
 
   const [selectedNode, setSelectedNode] = useState<QueueTopologyNode | null>(null);
-  // Pre-populate namespace filter from URL param (e.g. coming from Workloads page).
-  const [filterNamespace, setFilterNamespace] = useState(() => searchParams.get('ns') ?? '');
-  const [nsSelectOpen, setNsSelectOpen] = useState(false);
-  const [nsSearch, setNsSearch] = useState('');
+  const [filterCQ, setFilterCQ] = useState('');
+  const [cqSelectOpen, setCqSelectOpen] = useState(false);
+  const [cqSearch, setCqSearch] = useState('');
+
+  // Sync inbound ?ns= URL param to shared project selection (e.g. navigating from Workloads table).
+  useEffect(() => {
+    const nsParam = searchParams.get('ns');
+    if (nsParam && nsParam !== selectedProject) {
+      setSelectedProject(nsParam);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-refresh every 30 seconds without a full page reload
+  useInterval(() => {
+    refreshCQ();
+    refreshLQ();
+    refreshFl();
+    refreshNs();
+  }, REFRESH_INTERVAL_MS);
 
   // Auto-select a LocalQueue node when navigated here via ?lq= param (e.g. from Workloads table).
   const lqParam = searchParams.get('lq') ?? '';
@@ -68,14 +91,15 @@ const QueueInfrastructurePage: React.FC = () => {
   const loading = cqLoading || lqLoading || flLoading || nsLoading;
   const error = cqError ?? lqError ?? flError ?? nsError;
 
-  const namespaceOptions = namespaces.map((ns) => ns.name).sort();
+  // Only show spinner on initial load — background refreshes happen silently
+  // so the topology graph zoom/pan state is preserved.
+  const hasData = clusterQueues.length > 0 || localQueues.length > 0 || namespaces.length > 0;
+  const isInitialLoad = loading && !hasData;
+
+  const cqOptions = clusterQueues.map((cq) => cq.metadata.name).sort();
 
   return (
     <>
-      <PageSection>
-        <Title headingLevel="h1">Kueue Visualizer — Queue Infrastructure</Title>
-      </PageSection>
-
       {error && (
         <PageSection>
           <Alert variant="danger" title="Failed to load Kueue resources" isInline>
@@ -84,61 +108,66 @@ const QueueInfrastructurePage: React.FC = () => {
         </PageSection>
       )}
 
-      {loading ? (
+      {isInitialLoad ? (
         <PageSection>
           <Spinner aria-label="Loading queue resources" />
         </PageSection>
       ) : (
         <>
-          <PageSection padding={{ default: 'noPadding' }}>
-            <Toolbar>
-              <ToolbarContent>
-                <ToolbarItem>
-                  <Select
-                    isOpen={nsSelectOpen}
-                    onOpenChange={(o) => { setNsSelectOpen(o); if (!o) setNsSearch(''); }}
-                    onSelect={(_, v) => {
-                      setFilterNamespace(v as string);
-                      setNsSelectOpen(false);
-                      setNsSearch('');
-                    }}
-                    toggle={(ref) => (
-                      <MenuToggle ref={ref} onClick={() => setNsSelectOpen(!nsSelectOpen)}>
-                        {filterNamespace || 'All namespaces'}
-                      </MenuToggle>
-                    )}
-                  >
-                    <div style={{ padding: '8px 12px' }}>
-                      <SearchInput
-                        placeholder="Filter namespaces…"
-                        value={nsSearch}
-                        onChange={(_, v) => setNsSearch(v)}
-                        onClear={() => setNsSearch('')}
-                      />
-                    </div>
-                    <Divider />
-                    <SelectList>
-                      <SelectOption value="">All namespaces</SelectOption>
-                      {namespaceOptions
-                        .filter((ns) => ns.toLowerCase().includes(nsSearch.toLowerCase()))
-                        .map((ns) => (
-                          <SelectOption key={ns} value={ns}>{ns}</SelectOption>
-                        ))}
-                    </SelectList>
-                  </Select>
-                </ToolbarItem>
-              </ToolbarContent>
-            </Toolbar>
-          </PageSection>
-
           <PageSection>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+              <Title headingLevel="h1" style={{ margin: 0, whiteSpace: 'nowrap' }}>
+                Queue Infrastructure
+              </Title>
+
+              {/* Project filter — hello-world ProjectSelector with localStorage persistence */}
+              <ProjectSelector
+                selectedProject={selectedProject}
+                onSelect={setSelectedProject}
+              />
+
+              {/* ClusterQueue filter */}
+              <Select
+                isOpen={cqSelectOpen}
+                onOpenChange={(o) => { setCqSelectOpen(o); if (!o) setCqSearch(''); }}
+                onSelect={(_, v) => {
+                  setFilterCQ(v as string);
+                  setCqSelectOpen(false);
+                  setCqSearch('');
+                }}
+                toggle={(ref) => (
+                  <MenuToggle ref={ref} onClick={() => setCqSelectOpen(!cqSelectOpen)}>
+                    {filterCQ || 'All cluster queues'}
+                  </MenuToggle>
+                )}
+              >
+                <div style={{ padding: '8px 12px' }}>
+                  <SearchInput
+                    placeholder="Filter cluster queues…"
+                    value={cqSearch}
+                    onChange={(_, v) => setCqSearch(v)}
+                    onClear={() => setCqSearch('')}
+                  />
+                </div>
+                <Divider />
+                <SelectList>
+                  <SelectOption value="">All cluster queues</SelectOption>
+                  {cqOptions
+                    .filter((cq) => cq.toLowerCase().includes(cqSearch.toLowerCase()))
+                    .map((cq) => (
+                      <SelectOption key={cq} value={cq}>{cq}</SelectOption>
+                    ))}
+                </SelectList>
+              </Select>
+            </div>
+
             <Split hasGutter>
               <SplitItem isFilled>
                 <TopologyGraph
                   clusterQueues={clusterQueues}
                   localQueues={localQueues}
-
                   filterNamespace={filterNamespace}
+                  filterCQ={filterCQ}
                   onNodeSelect={setSelectedNode}
                   selectedNodeId={selectedNode?.id ?? null}
                 />
@@ -149,6 +178,17 @@ const QueueInfrastructurePage: React.FC = () => {
                     node={selectedNode}
                     clusterQueues={clusterQueues}
                     onClose={() => setSelectedNode(null)}
+                    onSelectCQ={(cqName) => {
+                      const cq = clusterQueues.find((q) => q.metadata.name === cqName);
+                      if (cq) {
+                        setSelectedNode({
+                          id: `cq:${cqName}`,
+                          kind: 'ClusterQueue',
+                          name: cqName,
+                          data: cq as ClusterQueue,
+                        });
+                      }
+                    }}
                   />
                 </SplitItem>
               )}

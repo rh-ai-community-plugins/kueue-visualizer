@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   PageSection,
@@ -24,6 +24,8 @@ import {
   useLocalQueues,
   useWorkloadTopOwner,
 } from '../../hooks/useKueueResources';
+import { useLastSelectedProject } from '../../hooks/useLastSelectedProject';
+import { ProjectSelector } from '../ProjectSelector';
 import WorkloadTable from './WorkloadTable';
 import WorkloadDrawer from './WorkloadDrawer';
 import type { Workload, WorkloadPhase } from '../../types/kueue';
@@ -38,20 +40,31 @@ const WorkloadsPage: React.FC = () => {
   const { localQueues } = useLocalQueues();
   const topOwnerMap = useWorkloadTopOwner(workloads);
 
+  // Shared project selection — persisted via localStorage key 'rhoai.last-selected-project'
+  // so the selected project is remembered when navigating back from the Infrastructure page.
+  const [selectedProject, setSelectedProject] = useLastSelectedProject();
+  const nsFilter = selectedProject ?? '';
+
   const [selectedWorkload, setSelectedWorkload] = useState<Workload | null>(null);
-  // Pre-populate from URL params (e.g. navigating from Infra topology node).
   const [searchText, setSearchText] = useState(() => searchParams.get('queue') ?? '');
-  const [nsFilter, setNsFilter] = useState(() => searchParams.get('ns') ?? '');
   const [cqFilter, setCqFilter] = useState(() => searchParams.get('cq') ?? '');
   const [phaseFilter, setPhaseFilter] = useState<WorkloadPhase | ''>('');
   const [phaseOpen, setPhaseOpen] = useState(false);
+
+  // Sync inbound ?ns= URL param to shared project selection (e.g. from Infrastructure page links).
+  useEffect(() => {
+    const nsParam = searchParams.get('ns');
+    if (nsParam && nsParam !== selectedProject) {
+      setSelectedProject(nsParam);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filtered = workloads.filter((w) => {
     if (nsFilter && w.metadata.namespace !== nsFilter) return false;
     if (cqFilter) {
       const admittedCQ = w.status?.admission?.clusterQueue;
       if (admittedCQ !== cqFilter) {
-        // For pending workloads, fall back to checking via the LocalQueue's bound ClusterQueue.
         const lq = localQueues.find(
           (l) => l.metadata.name === w.spec.queueName && l.metadata.namespace === w.metadata.namespace,
         );
@@ -96,6 +109,12 @@ const WorkloadsPage: React.FC = () => {
         <Toolbar>
           <ToolbarContent>
             <ToolbarItem>
+              <ProjectSelector
+                selectedProject={selectedProject}
+                onSelect={setSelectedProject}
+              />
+            </ToolbarItem>
+            <ToolbarItem>
               <SearchInput
                 placeholder="Search by name, namespace, or queue"
                 value={searchText}
@@ -103,14 +122,6 @@ const WorkloadsPage: React.FC = () => {
                 onClear={() => setSearchText('')}
               />
             </ToolbarItem>
-            {nsFilter && (
-              <ToolbarItem>
-                <span style={{ fontSize: '0.85em' }}>
-                  Namespace: <strong>{nsFilter}</strong>{' '}
-                  <Button variant="link" isInline onClick={() => setNsFilter('')}>✕</Button>
-                </span>
-              </ToolbarItem>
-            )}
             {cqFilter && (
               <ToolbarItem>
                 <span style={{ fontSize: '0.85em' }}>

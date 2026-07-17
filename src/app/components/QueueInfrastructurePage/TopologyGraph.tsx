@@ -240,10 +240,10 @@ const makeShape = (
         >
           {displayLabel}
         </text>
-        {/* Selection ring: bright white border on the node edge, colored inset ring just inside */}
+        {/* Selection ring: gold outer border + colored inset ring */}
         {selected && (
           <>
-            <rect x={0} y={0} width={width} height={height} rx={8} fill="none" stroke="white" strokeWidth={5} />
+            <rect x={0} y={0} width={width} height={height} rx={8} fill="none" stroke="#FFD700" strokeWidth={5} />
             <rect x={3} y={3} width={width - 6} height={height - 6} rx={5} fill="none" stroke={color} strokeWidth={2} strokeOpacity={1} />
           </>
         )}
@@ -442,6 +442,7 @@ interface TopologyGraphProps {
   localQueues: LocalQueue[];
   selectedNodeId: string | null;
   filterNamespace: string;
+  filterCQ: string;
   onNodeSelect: (node: QueueTopologyNode | null) => void;
 }
 
@@ -452,11 +453,13 @@ const TopologyGraphInner: React.FC<TopologyGraphProps> = ({
   localQueues,
   selectedNodeId,
   filterNamespace,
+  filterCQ,
   onNodeSelect,
  }) => {
   const controller = useVisualizationController();
   // Track previous structural state so data-only refreshes don't trigger re-layout (which resets zoom/pan).
   const prevFilterNs = useRef<string | undefined>(undefined);
+  const prevFilterCQ = useRef<string | undefined>(undefined);
   const prevNodeIds = useRef<string>('');
 
   useEffect(() => {
@@ -468,6 +471,14 @@ const TopologyGraphInner: React.FC<TopologyGraphProps> = ({
     controller.addEventListener(GRAPH_LAYOUT_END_EVENT, onLayoutEnd);
     return () => { controller.removeEventListener(GRAPH_LAYOUT_END_EVENT, onLayoutEnd); };
   }, [controller]);
+
+  // Sync external selection (e.g. clicking a cohort member card) into the MobX store
+  // so the node gets the gold highlight ring in the graph.
+  useEffect(() => {
+    if (selectedNodeId !== selectionStore.selectedId) {
+      setSelectedId(selectedNodeId);
+    }
+  }, [selectedNodeId]);
 
   useEffect(() => {
     const handler = (ids: string[]) => {
@@ -493,13 +504,28 @@ const TopologyGraphInner: React.FC<TopologyGraphProps> = ({
     const nodes: NodeModel[] = [];
     const edges: EdgeModel[] = [];
 
+    // CQ filter: show selected CQ + all cohort siblings (full architecture context).
+    // Namespace filter only restricts which LocalQueues are shown, not which CQs.
+    let visibleCQs = clusterQueues;
+    if (filterCQ) {
+      const selectedCQ = clusterQueues.find((cq) => cq.metadata.name === filterCQ);
+      const cohort = selectedCQ?.spec.cohort;
+      visibleCQs = cohort
+        ? clusterQueues.filter((cq) => cq.spec.cohort === cohort)
+        : clusterQueues.filter((cq) => cq.metadata.name === filterCQ);
+    }
+
+    // Namespace filter: restrict LocalQueues; when no CQ filter also hides CQs with no visible LQs.
+    const lqsForCQs = localQueues.filter((lq) =>
+      visibleCQs.some((cq) => cq.metadata.name === lq.spec.clusterQueue),
+    );
     const visibleLQs = filterNamespace
-      ? localQueues.filter((lq) => lq.metadata.namespace === filterNamespace)
-      : localQueues;
-    const visibleCQNames = new Set(visibleLQs.map((lq) => lq.spec.clusterQueue));
-    const visibleCQs = filterNamespace
-      ? clusterQueues.filter((cq) => visibleCQNames.has(cq.metadata.name))
-      : clusterQueues;
+      ? lqsForCQs.filter((lq) => lq.metadata.namespace === filterNamespace)
+      : lqsForCQs;
+    if (!filterCQ && filterNamespace) {
+      const cqNamesWithLQs = new Set(visibleLQs.map((lq) => lq.spec.clusterQueue));
+      visibleCQs = visibleCQs.filter((cq) => cqNamesWithLQs.has(cq.metadata.name));
+    }
 
     // Cohort nodes
     const cohortNames = Array.from(
@@ -604,8 +630,9 @@ const TopologyGraphInner: React.FC<TopologyGraphProps> = ({
     // Detect structural changes (new/removed nodes, filter change, or borrowing state change) vs pure data refresh.
     const borrowingEdgeIds = edges.filter((e) => e.type === 'edge-borrow').map((e) => e.id).sort().join(',');
     const nodeIdKey = nodes.map((n) => n.id).sort().join(',') + '|' + borrowingEdgeIds;
-    const isStructural = filterNamespace !== prevFilterNs.current || nodeIdKey !== prevNodeIds.current;
+    const isStructural = filterNamespace !== prevFilterNs.current || filterCQ !== prevFilterCQ.current || nodeIdKey !== prevNodeIds.current;
     prevFilterNs.current = filterNamespace;
+    prevFilterCQ.current = filterCQ;
     prevNodeIds.current = nodeIdKey;
 
     // Merge mode (true) preserves zoom/pan; full rebuild (false) re-runs layout + auto-fits.
@@ -613,7 +640,7 @@ const TopologyGraphInner: React.FC<TopologyGraphProps> = ({
       { graph: { id: 'kueue-topology', type: 'graph', layout: 'Dagre' }, nodes, edges },
       !isStructural,
     );
-  }, [clusterQueues, localQueues, filterNamespace, controller]);
+  }, [clusterQueues, localQueues, filterNamespace, filterCQ, controller]);
 
   const controlButtons = createTopologyControlButtons({
     ...defaultControlButtonsOptions,

@@ -29,13 +29,14 @@ interface NodeDetailPanelProps {
   node: QueueTopologyNode;
   clusterQueues: ClusterQueue[];
   onClose: () => void;
+  onSelectCQ?: (cqName: string) => void;
 }
 
-const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({ node, clusterQueues, onClose }) => {
+const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({ node, clusterQueues, onClose, onSelectCQ }) => {
   const [activeTab, setActiveTab] = React.useState(0);
 
   return (
-    <Card isFullHeight>
+    <Card>
       <CardHeader
         actions={{ actions: <Button variant="plain" onClick={onClose} aria-label="Close">✕</Button> }}
       >
@@ -47,7 +48,7 @@ const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({ node, clusterQueues, 
             <StackItem>
               <Title headingLevel="h3">{node.name}</Title>
               {node.namespace && (
-                <span style={{ color: '#6a6e73', fontSize: '0.85em' }}>ns: {node.namespace}</span>
+                <span style={{ color: '#6a6e73', fontSize: '0.85em' }}>project: {node.namespace}</span>
               )}
             </StackItem>
           </Stack>
@@ -65,7 +66,7 @@ const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({ node, clusterQueues, 
           <FlavorDetail flavorName={node.name} clusterQueues={clusterQueues} />
         )}
         {node.kind === 'Cohort' && (
-          <CohortDetail cohortName={node.name} clusterQueues={clusterQueues} />
+          <CohortDetail cohortName={node.name} clusterQueues={clusterQueues} onSelectCQ={onSelectCQ} />
         )}
       </CardBody>
     </Card>
@@ -320,7 +321,37 @@ const FlavorDetail: React.FC<{ flavorName: string; clusterQueues: ClusterQueue[]
 
 // --- Cohort detail ---
 
-const CohortDetail: React.FC<{ cohortName: string; clusterQueues: ClusterQueue[] }> = ({ cohortName, clusterQueues }) => {
+function isMemberLending(cq: ClusterQueue, members: ClusterQueue[]): boolean {
+  // A member is actively lending if at least one sibling is borrowing AND
+  // this member has spare capacity within its lendingLimit for any flavor::resource.
+  const siblingsAreBorrowing = members.some(
+    (m) =>
+      m.metadata.name !== cq.metadata.name &&
+      (m.status?.flavorsReservation ?? []).some((fu) =>
+        fu.resources.some((r) => parseQuantity(r.borrowed ?? '0') > 0),
+      ),
+  );
+  if (!siblingsAreBorrowing) return false;
+
+  for (const rg of cq.spec.resourceGroups ?? []) {
+    for (const fl of rg.flavors) {
+      for (const res of fl.resources) {
+        const ll = res.lendingLimit;
+        if (!ll || ll === '0') continue;
+        if (parseQuantity(ll) <= 0) continue;
+        const nomVal = parseQuantity(res.nominalQuota);
+        const fu = cq.status?.flavorsReservation?.find((f) => f.name === fl.name);
+        const ru = fu?.resources.find((r) => r.name === res.name);
+        const ownUsed = Math.max(0, parseQuantity(ru?.total ?? '0') - parseQuantity(ru?.borrowed ?? '0'));
+        if (ownUsed < nomVal) return true;
+      }
+    }
+  }
+  return false;
+}
+
+const CohortDetail: React.FC<{ cohortName: string; clusterQueues: ClusterQueue[]; onSelectCQ?: (cqName: string) => void }> = ({ cohortName, clusterQueues, onSelectCQ }) => {
+  const navigate = useNavigate();
   const members = clusterQueues.filter((cq) => cq.spec.cohort === cohortName);
 
   // Aggregate per flavor::resource across all members.
@@ -358,45 +389,20 @@ const CohortDetail: React.FC<{ cohortName: string; clusterQueues: ClusterQueue[]
     return val % 1 === 0 ? String(val) : val.toFixed(2);
   };
 
-  // Per-member lending contribution per flavor::resource:
-  // contribution_i = min(max(0, nominal_i - ownUsed_i), lendingLimit_i)
-  // where ownUsed_i = total_i - borrowed_i (usage from own nominal only)
-  type MemberLending = {
-    cqName: string;
-    contributions: Map<string, number>; // key -> contribution value
-    borrowing: Map<string, number>;     // key -> borrowed value
-  };
-
-  const memberLending: MemberLending[] = members.map((cq) => {
-    const contributions = new Map<string, number>();
-    const borrowing = new Map<string, number>();
-
-    for (const rg of cq.spec.resourceGroups ?? []) {
-      for (const fl of rg.flavors) {
-        for (const res of fl.resources) {
-          const key = `${fl.name}::${res.name}`;
-          const nominal = parseQuantity(res.nominalQuota);
-          const lendingLimit = res.lendingLimit ? parseQuantity(res.lendingLimit) : 0;
-          const fuEntry = cq.status?.flavorsReservation?.find((fu) => fu.name === fl.name);
-          const resEntry = fuEntry?.resources.find((r) => r.name === res.name);
-          const totalUsed = parseQuantity(resEntry?.total ?? '0');
-          const borrowed = parseQuantity(resEntry?.borrowed ?? '0');
-          const ownUsed = Math.max(0, totalUsed - borrowed);
-          const spare = Math.max(0, nominal - ownUsed);
-          contributions.set(key, Math.min(spare, lendingLimit));
-          if (borrowed > 0) borrowing.set(key, borrowed);
-        }
-      }
-    }
-    return { cqName: cq.metadata.name, contributions, borrowing };
-  });
-
   return (
     <Stack hasGutter>
-      {/* ── Total quota usage bars ── */}
+      <StackItem>
+        <Button
+          variant="secondary"
+          onClick={() => navigate('/kueue/workloads')}
+        >
+          View workloads →
+        </Button>
+      </StackItem>
+      {/* ── Total quota pool — unchanged ── */}
       {poolKeys.length > 0 && (
         <StackItem>
-          <div style={{ fontSize: '0.78em', fontWeight: 600, marginBottom: '0.5rem', color: '#151515' }}>
+          <div style={{ fontSize: '0.85em', fontWeight: 600, marginBottom: '0.5rem', color: '#151515' }}>
             Total quota pool
             <HelpTip content="Sum of all members' nominal quotas. Shows how much of the combined pool is in use." />
           </div>
@@ -408,12 +414,12 @@ const CohortDetail: React.FC<{ cohortName: string; clusterQueues: ClusterQueue[]
             const pct = nominal > 0 ? Math.min(100, Math.round((used / nominal) * 100)) : 0;
             return (
               <div key={key} style={{ marginBottom: '0.5rem' }}>
-                <div style={{ fontSize: '0.78em', color: '#6a6e73', marginBottom: '0.15rem' }}>
+                <div style={{ fontSize: '0.82em', color: '#6a6e73', marginBottom: '0.15rem' }}>
                   <strong style={{ color: '#151515' }}>{flavorName}</strong> · {resName}
                   {': '}{fmt(used, key)} / {fmt(nominal, key)}
                   {borrowed > 0 && (
                     <Label color="orange" isCompact style={{ marginLeft: 6 }}>
-                      {fmt(borrowed, key)} borrowed across cohort
+                      {fmt(borrowed, key)} borrowed
                     </Label>
                   )}
                 </div>
@@ -426,134 +432,70 @@ const CohortDetail: React.FC<{ cohortName: string; clusterQueues: ClusterQueue[]
 
       <StackItem><Divider /></StackItem>
 
-      {/* ── Lending pool breakdown ── */}
+      {/* ── Per-member overview — clean card layout ── */}
       <StackItem>
-        <div style={{ fontSize: '0.78em', fontWeight: 600, marginBottom: '0.4rem', color: '#151515' }}>
-          Lending pool
-          <HelpTip content="Each member contributes spare quota (up to its lendingLimit) to a shared pool. Other members can borrow from this pool. Contribution = min(nominalQuota − ownUsed, lendingLimit)." />
+        <div style={{ fontSize: '0.85em', fontWeight: 600, marginBottom: '0.5rem', color: '#151515' }}>
+          Members ({members.length})
         </div>
-        {poolKeys.map((key) => {
-          const [flavorName, resName] = key.split('::');
-          const totalPool = memberLending.reduce((s, m) => s + (m.contributions.get(key) ?? 0), 0);
-          const totalLent = borrowedTotalMap.get(key) ?? 0;
-          const available = Math.max(0, totalPool - totalLent);
-          const poolPct = totalPool > 0 ? Math.min(100, Math.round((totalLent / totalPool) * 100)) : 0;
+        {members.map((cq) => {
+          const borrowParts: string[] = [];
+          for (const fu of cq.status?.flavorsReservation ?? []) {
+            for (const res of fu.resources) {
+              const b = parseQuantity(res.borrowed ?? '0');
+              if (b > 0) borrowParts.push(`${res.borrowed} ${res.name.split('/').pop()}`);
+            }
+          }
+          const isBorrowing = borrowParts.length > 0;
+          const isLending = isMemberLending(cq, members);
+          const pending = cq.status?.pendingWorkloads ?? 0;
+          const clickable = !!onSelectCQ;
 
           return (
-            <div key={key} style={{ marginBottom: '0.75rem' }}>
-              <div style={{ fontSize: '0.78em', color: '#6a6e73', marginBottom: '0.2rem' }}>
-                <strong style={{ color: '#151515' }}>{flavorName}</strong> · {resName}
-                {' — pool: '}{fmt(totalPool, key)}
-                {totalLent > 0
-                  ? <span style={{ color: '#EC7A08' }}> · lent: {fmt(totalLent, key)} · available: {fmt(available, key)}</span>
-                  : <span style={{ color: '#3E8635' }}> · all available</span>}
-              </div>
-              {totalPool > 0 && (
-                <div style={{ height: 6, borderRadius: 3, background: '#f0f0f0', overflow: 'hidden', marginBottom: '0.3rem' }}>
-                  <div style={{ width: `${poolPct}%`, height: '100%', background: '#EC7A08' }} />
+            <div
+              key={cq.metadata.name}
+              onClick={() => onSelectCQ?.(cq.metadata.name)}
+              style={{
+                padding: '0.6rem 0.75rem',
+                marginBottom: '0.5rem',
+                border: `1px solid ${isBorrowing ? '#EC7A08' : isLending ? '#3E8635' : '#d2d2d2'}`,
+                borderRadius: 6,
+                background: isBorrowing ? 'rgba(236,122,8,0.04)' : isLending ? 'rgba(62,134,53,0.04)' : '#fafafa',
+                cursor: clickable ? 'pointer' : 'default',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                <Label color="red" isCompact>{cq.metadata.name}</Label>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  {isBorrowing && (
+                    <span style={{ color: '#EC7A08', fontSize: '0.85em', fontWeight: 600 }}>
+                      ↗ {borrowParts.join(', ')}
+                    </span>
+                  )}
+                  {isLending && (
+                    <span style={{ color: '#3E8635', fontSize: '0.85em', fontWeight: 600 }}>
+                      ↙ lending
+                    </span>
+                  )}
+                  {clickable && (
+                    <span style={{ color: '#6a6e73', fontSize: '0.75em' }}>→</span>
+                  )}
                 </div>
-              )}
-              {/* Per-member contribution rows */}
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8em' }}>
-                <thead>
-                  <tr style={{ color: '#6a6e73' }}>
-                    <th style={{ textAlign: 'left', padding: '2px 4px', fontWeight: 400 }}>Member</th>
-                    <th style={{ textAlign: 'right', padding: '2px 4px', fontWeight: 400 }}>Nominal</th>
-                    <th style={{ textAlign: 'right', padding: '2px 4px', fontWeight: 400 }}>Own use</th>
-                    <th style={{ textAlign: 'right', padding: '2px 4px', fontWeight: 400 }}>Lend limit</th>
-                    <th style={{ textAlign: 'right', padding: '2px 4px', fontWeight: 400 }}>Contributing</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {members.map((cq) => {
-                    const ml = memberLending.find((m) => m.cqName === cq.metadata.name);
-                    const contribution = ml?.contributions.get(key) ?? 0;
-                    const isBorrowing = (ml?.borrowing.get(key) ?? 0) > 0;
-                    const borrowedAmt = ml?.borrowing.get(key) ?? 0;
-
-                    const flavorSpec = cq.spec.resourceGroups
-                      .flatMap((rg) => rg.flavors.filter((fl) => fl.name === flavorName))
-                      .flatMap((fl) => fl.resources)
-                      .find((r) => r.name === resName);
-                    const nominal = parseQuantity(flavorSpec?.nominalQuota ?? '0');
-                    const lendingLimit = flavorSpec?.lendingLimit ? parseQuantity(flavorSpec.lendingLimit) : 0;
-                    const fuEntry = cq.status?.flavorsReservation?.find((fu) => fu.name === flavorName);
-                    const resEntry = fuEntry?.resources.find((r) => r.name === resName);
-                    const totalUsed = parseQuantity(resEntry?.total ?? '0');
-                    const ownUsed = Math.max(0, totalUsed - borrowedAmt);
-
-                    return (
-                      <tr key={cq.metadata.name} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                        <td style={{ padding: '3px 4px' }}>
-                          <Label color="red" isCompact>{cq.metadata.name}</Label>
-                          {isBorrowing && (
-                            <span style={{ color: '#EC7A08', fontSize: '0.85em', marginLeft: 4 }}>
-                              ↗ borrowing {fmt(borrowedAmt, key)}
-                            </span>
-                          )}
-                        </td>
-                        <td style={{ textAlign: 'right', padding: '3px 4px' }}>{fmt(nominal, key)}</td>
-                        <td style={{ textAlign: 'right', padding: '3px 4px' }}>{fmt(ownUsed, key)}</td>
-                        <td style={{ textAlign: 'right', padding: '3px 4px', color: lendingLimit === 0 ? '#6a6e73' : '#3E8635' }}>
-                          {lendingLimit === 0 ? 'none' : fmt(lendingLimit, key)}
-                        </td>
-                        <td style={{ textAlign: 'right', padding: '3px 4px', color: contribution > 0 ? '#3E8635' : '#6a6e73', fontWeight: contribution > 0 ? 600 : 400 }}>
-                          {contribution > 0 ? fmt(contribution, key) : '—'}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              </div>
+              <div style={{ display: 'flex', gap: '1.5rem' }}>
+                <div>
+                  <div style={{ fontSize: '0.72em', color: '#6a6e73', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Admitted</div>
+                  <div style={{ fontSize: '1.25em', fontWeight: 700 }}>{cq.status?.admittedWorkloads ?? 0}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.72em', color: '#6a6e73', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Pending</div>
+                  <div style={{ fontSize: '1.25em', fontWeight: 700, color: pending > 0 ? '#EC7A08' : 'inherit' }}>
+                    {pending}
+                  </div>
+                </div>
+              </div>
             </div>
           );
         })}
-      </StackItem>
-
-      <StackItem><Divider /></StackItem>
-
-      {/* ── Per-member workload summary ── */}
-      <StackItem>
-        <div style={{ fontSize: '0.78em', fontWeight: 600, marginBottom: '0.4rem' }}>
-          Workload summary
-        </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82em' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid #d2d2d2', color: '#6a6e73' }}>
-              <th style={{ textAlign: 'left', padding: '2px 4px' }}>Queue</th>
-              <th style={{ textAlign: 'right', padding: '2px 4px' }}>Admitted</th>
-              <th style={{ textAlign: 'right', padding: '2px 4px' }}>Pending</th>
-              <th style={{ textAlign: 'left', padding: '2px 4px' }}>Borrowing</th>
-            </tr>
-          </thead>
-          <tbody>
-            {members.map((cq) => {
-              const borrowParts: string[] = [];
-              for (const fu of cq.status?.flavorsReservation ?? []) {
-                for (const res of fu.resources) {
-                  const b = parseQuantity(res.borrowed ?? '0');
-                  if (b > 0) borrowParts.push(`${res.borrowed} ${res.name.split('/').pop()}`);
-                }
-              }
-              return (
-                <tr key={cq.metadata.name} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <td style={{ padding: '3px 4px' }}>
-                    <Label color="red" isCompact>{cq.metadata.name}</Label>
-                  </td>
-                  <td style={{ textAlign: 'right', padding: '3px 4px' }}>{cq.status?.admittedWorkloads ?? 0}</td>
-                  <td style={{ textAlign: 'right', padding: '3px 4px', color: (cq.status?.pendingWorkloads ?? 0) > 0 ? '#EC7A08' : 'inherit' }}>
-                    {cq.status?.pendingWorkloads ?? 0}
-                  </td>
-                  <td style={{ padding: '3px 4px' }}>
-                    {borrowParts.length > 0
-                      ? <span style={{ color: '#EC7A08', fontWeight: 600 }}>↗ {borrowParts.join(', ')}</span>
-                      : <span style={{ color: '#6a6e73' }}>—</span>}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
       </StackItem>
     </Stack>
   );
