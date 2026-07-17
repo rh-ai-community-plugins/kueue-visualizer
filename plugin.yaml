@@ -1,22 +1,56 @@
-apiVersion: backend.openshift.io/v1
-kind: Plugin
-metadata:
-  name: kueue-plugin
-  displayName: Kueue Plugin
-  description: Kueue queue visibility for the RHOAI Dashboard — queue topology, workload scheduling status, cohort borrowing, and resource flavor mapping.
-  version: 0.1.0
-  link:
-    url: https://github.com/rh-ai-community-plugins/kueue-plugin
+# --- Plugin identity (required) ---
+name: kueue-plugin                   # [PLUGIN-SPECIFIC] unique plugin identifier (kebab-case)
+displayName: Kueue                   # [PLUGIN-SPECIFIC] human-readable name
+description: Kueue queue visibility for the RHOAI Dashboard — queue topology, workload scheduling status, cohort borrowing, and resource flavor mapping.
+version: 0.1.0
+
+# --- Maintainer (required) ---
+maintainer:                          # [PLUGIN-SPECIFIC]
+  name: Robert Lundberg
+  github: rlundber
+
+# --- RHOAI compatibility (required) ---
+rhoai_compatibility:
+  min_version: "3.3.0"
+  tested_versions: ["3.3.0"]
+
+# --- Deployment (required) ---
+deployment_model: cluster-shared     # per-project | cluster-shared | both
+
+image:                               # [PLUGIN-SPECIFIC]
+  repository: quay.io/rlundber/kueue-plugin
+  tag: "latest"
+
+# --- Installation (required) ---
+install:
+  method: manual
+  helm:
+    chart_path: chart/
+  prerequisites: []
+  instructions: https://github.com/rh-ai-community-plugins/kueue-plugin
+
+# --- Dashboard integration (required) ---
 remote:
   type: module-federation
-spec:
-  name: kueuePlugin
-  scope: kueuePlugin
-  remoteEntry: https://<your-route>/remoteEntry.js
-  paths:
-    - type: route
-      path: /kueue
-    - type: icon
-      path: kueuePlugin/Icon
-  extensions:
-    - kueuePlugin/extensions
+  spec:
+    name: kueuePlugin                # [PLUGIN-SPECIFIC] Module Federation container name (camelCase)
+    scope: kueuePlugin               # [PLUGIN-SPECIFIC] must match name above
+    # [PLUGIN-SPECIFIC] Update this URL to point to your deployed OpenShift route.
+    remoteEntry: https://<your-openshift-route>/remoteEntry.js
+    paths:
+      - type: route
+        path: /kueue                 # [PLUGIN-SPECIFIC] must match route prefix in extensions.ts
+        extensions:
+          - kueuePlugin/extensions   # [PLUGIN-SPECIFIC] {scope}/extensions
+      - type: icon
+        path: kueuePlugin/Icon       # [PLUGIN-SPECIFIC] {scope}/Icon
+
+# --- RBAC (required) ---
+rbac:
+  required_roles: []
+  cluster_roles: true               # ClusterRole for kueue.x-k8s.io resources
+
+# --- Support (optional) ---
+support:
+  repo: https://github.com/rh-ai-community-plugins/kueue-plugin
+  issues: https://github.com/rh-ai-community-plugins/kueue-plugin/issues
