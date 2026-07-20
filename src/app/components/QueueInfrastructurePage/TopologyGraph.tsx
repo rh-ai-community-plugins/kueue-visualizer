@@ -47,11 +47,11 @@ const NODE_COHORT = 'Cohort';
 const NODE_FLAVOR = 'ResourceFlavor';
 
 const NODE_COLORS: Record<string, string> = {
-  [NODE_NAMESPACE]: '#EC7A08',
-  [NODE_LOCAL_QUEUE]: '#0066CC',
-  [NODE_CLUSTER_QUEUE]: '#C9190B',
+  [NODE_NAMESPACE]: 'var(--pf-t--global--color--status--warning--default)',
+  [NODE_LOCAL_QUEUE]: 'var(--pf-t--global--color--brand--default)',
+  [NODE_CLUSTER_QUEUE]: 'var(--pf-t--global--color--status--danger--default)',
   [NODE_COHORT]: '#6A0080',
-  [NODE_FLAVOR]: '#3E8635',
+  [NODE_FLAVOR]: 'var(--pf-t--global--color--status--success--default)',
 };
 
 // Compute scheduled fraction (own workloads / nominal) for the most-saturated resource in a CQ.
@@ -216,7 +216,7 @@ const makeShape = (
             {/* Lent-to-cohort segment (green) */}
             {lentPct > 0 && (
               <rect x={width * scheduledPct} y={0} width={width * lentPct} height={height}
-                fill="#3E8635" fillOpacity={0.95} stroke="none" clipPath={`url(#${clipId})`} />
+                fill="var(--pf-t--global--color--status--success--default)" fillOpacity={0.95} stroke="none" clipPath={`url(#${clipId})`} />
             )}
             {/* Border */}
             <rect x={0} y={0} width={width} height={height} rx={8} fill="none" stroke={color} strokeWidth={1.5} strokeOpacity={0.6} />
@@ -250,7 +250,7 @@ const makeShape = (
         {/* Pending badge */}
         {pending > 0 && (
           <>
-            <circle cx={width - 10} cy={10} r={9} fill="#EC7A08" stroke="white" strokeWidth={1.5} />
+            <circle cx={width - 10} cy={10} r={9} fill="var(--pf-t--global--color--status--warning--default)" stroke="white" strokeWidth={1.5} />
             <text
               x={width - 10} y={10} textAnchor="middle" dominantBaseline="central"
               fill="white" fontSize={pending > 99 ? 7 : 9} fontWeight="bold"
@@ -319,13 +319,13 @@ const BorrowingEdge = observer((props: any) => {
   return (
     <g>
       {/* Orange edge line */}
-      <path d={pathD} stroke="#EC7A08" strokeWidth={2.5} fill="none" />
+      <path d={pathD} stroke="var(--pf-t--global--color--status--warning--default)" strokeWidth={2.5} fill="none" />
       {/* Inline arrowhead polygon */}
-      <polygon points={`${tip.x},${tip.y} ${left.x},${left.y} ${right.x},${right.y}`} fill="#EC7A08" />
+      <polygon points={`${tip.x},${tip.y} ${left.x},${left.y} ${right.x},${right.y}`} fill="var(--pf-t--global--color--status--warning--default)" />
       {/* Pill label centered on longest segment */}
       {label && (
         <g transform={`translate(${midX}, ${midY})`}>
-          <rect x={-34} y={-9} width={68} height={18} rx={9} fill="#EC7A08" />
+          <rect x={-34} y={-9} width={68} height={18} rx={9} fill="var(--pf-t--global--color--status--warning--default)" />
           <text textAnchor="middle" dominantBaseline="central" fill="white" fontSize={10} fontWeight="bold">
             {label}
           </text>
@@ -381,8 +381,9 @@ const TopologyLegend: React.FC = () => {
         top: 8,
         right: 8,
         zIndex: 10,
-        background: '#fff',
-        border: '1px solid #d2d2d2',
+        background: 'var(--pf-t--global--background--color--primary--default)',
+        color: 'var(--pf-t--global--text--color--regular)',
+        border: '1px solid var(--pf-t--global--border--color--default)',
         borderRadius: 4,
         minWidth: 210,
         maxWidth: 290,
@@ -397,13 +398,13 @@ const TopologyLegend: React.FC = () => {
           alignItems: 'center',
           padding: '5px 10px',
           cursor: 'pointer',
-          borderBottom: open ? '1px solid #d2d2d2' : 'none',
+          borderBottom: open ? '1px solid var(--pf-t--global--border--color--default)' : 'none',
           userSelect: 'none',
         }}
         onClick={() => setOpen(!open)}
       >
         <strong>Legend</strong>
-        <span style={{ color: '#6a6e73', fontSize: '0.9em' }}>{open ? '▲' : '▼'}</span>
+        <span style={{ color: 'var(--pf-t--global--text--color--subtle)', fontSize: '0.9em' }}>{open ? '▲' : '▼'}</span>
       </div>
       {open && (
         <div style={{ padding: '8px 10px' }}>
@@ -421,14 +422,14 @@ const TopologyLegend: React.FC = () => {
               />
               <div>
                 <strong>{e.kind}</strong>
-                <div style={{ color: '#6a6e73', lineHeight: 1.3 }}>{e.desc}</div>
+                <div style={{ color: 'var(--pf-t--global--text--color--subtle)', lineHeight: 1.3 }}>{e.desc}</div>
               </div>
             </div>
           ))}
-          <div style={{ color: '#6a6e73', borderTop: '1px solid #d2d2d2', paddingTop: 6, marginTop: 2 }}>
+          <div style={{ color: 'var(--pf-t--global--text--color--subtle)', borderTop: '1px solid var(--pf-t--global--border--color--default)', paddingTop: 6, marginTop: 2 }}>
             Orange badge = pending workloads. Fill shows utilization:{' '}
-            <span style={{ color: '#C9190B', fontWeight: 600 }}>■</span> scheduled,{' '}
-            <span style={{ color: '#3E8635', fontWeight: 600 }}>■</span> lent to cohort pool.{' '}
+            <span style={{ color: 'var(--pf-t--global--color--status--danger--default)', fontWeight: 600 }}>■</span> scheduled,{' '}
+            <span style={{ color: 'var(--pf-t--global--color--status--success--default)', fontWeight: 600 }}>■</span> lent to cohort pool.{' '}
             <strong>↗</strong> = active borrowing.
           </div>
         </div>
@@ -656,7 +657,7 @@ const TopologyGraphInner: React.FC<TopologyGraphProps> = ({
   return (
     <div style={{ position: 'relative' }}>
       <TopologyView
-        style={{ height: '520px', border: '1px solid #d2d2d2', borderRadius: '4px' }}
+        style={{ height: '520px', border: '1px solid var(--pf-t--global--border--color--default)', borderRadius: '4px', background: 'var(--pf-t--global--background--color--secondary--default)' }}
         controlBar={<TopologyControlBar controlButtons={controlButtons} />}
       >
         <VisualizationSurface state={{ selectedIds: selectedNodeId ? [selectedNodeId] : [] }} />

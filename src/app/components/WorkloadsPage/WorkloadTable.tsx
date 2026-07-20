@@ -101,7 +101,7 @@ const WorkloadTable: React.FC<WorkloadTableProps> = ({
                   return displayName ? (
                     <>
                       {displayName}
-                      <span style={{ color: '#6a6e73', fontSize: '0.78em', marginLeft: '0.4rem' }}>
+                      <span style={{ color: 'var(--pf-t--global--text--color--subtle)', fontSize: '0.78em', marginLeft: 'var(--pf-t--global--spacer--xs)' }}>
                         ({w.metadata.name})
                       </span>
                     </>
@@ -116,7 +116,7 @@ const WorkloadTable: React.FC<WorkloadTableProps> = ({
                   const kind = gvk?.match(/Kind=(\w+)/)?.[1]
                     ?? w.metadata.ownerReferences?.find((r) => r.controller)?.kind
                     ?? w.metadata.ownerReferences?.[0]?.kind;
-                  return kind ?? <span style={{ color: '#6a6e73' }}>—</span>;
+                  return kind ?? <span style={{ color: 'var(--pf-t--global--text--color--subtle)' }}>—</span>;
                 })()}
               </Td>
               <Td>{w.metadata.namespace ?? '—'}</Td>
@@ -139,7 +139,7 @@ const WorkloadTable: React.FC<WorkloadTableProps> = ({
                 ) : (
                   <span
                     title={`LocalQueue "${w.spec.queueName}" does not exist in namespace "${w.metadata.namespace}"`}
-                    style={{ color: '#EC7A08', cursor: 'help' }}
+                    style={{ color: 'var(--pf-t--global--color--status--warning--default)', cursor: 'help' }}
                   >
                     {w.spec.queueName} ⚠
                   </span>
@@ -155,7 +155,7 @@ const WorkloadTable: React.FC<WorkloadTableProps> = ({
                   const inferredCQ = lq?.spec.clusterQueue;
                   return inferredCQ
                     ? <><Label color="red" isCompact variant="outline">{inferredCQ}</Label></>
-                    : <span style={{ color: '#6a6e73' }}>—</span>;
+                    : <span style={{ color: 'var(--pf-t--global--text--color--subtle)' }}>—</span>;
                 })()}
               </Td>
               <Td>
@@ -169,7 +169,7 @@ const WorkloadTable: React.FC<WorkloadTableProps> = ({
               <Td>
                 {info.isBorrowing
                   ? <Label color="orange" isCompact>Yes{info.borrowingFrom ? ` from ${info.borrowingFrom}` : ''}</Label>
-                  : <span style={{ color: '#6a6e73' }}>No</span>}
+                  : <span style={{ color: 'var(--pf-t--global--text--color--subtle)' }}>No</span>}
               </Td>
               <Td>{w.spec.priority ?? w.spec.priorityClassName ?? '—'}</Td>
               <Td>{new Date(w.metadata.creationTimestamp).toLocaleString()}</Td>

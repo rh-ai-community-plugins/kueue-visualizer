@@ -15,6 +15,8 @@ import {
   LabelGroup,
   Divider,
   Alert,
+  ProgressStepper,
+  ProgressStep,
 } from '@patternfly/react-core';
 import type { Workload, ClusterQueue, LocalQueue, Condition } from '../../types/kueue';
 import { computeWorkloadQueueInfo } from '../../hooks/useKueueResources';
@@ -55,7 +57,7 @@ const WorkloadDrawer: React.FC<WorkloadDrawerProps> = ({
             return displayName ? (
               <>
                 <Title headingLevel="h2">{displayName}</Title>
-                <span style={{ fontSize: '0.78em', color: '#6a6e73' }}>
+                <span style={{ fontSize: '0.78em', color: 'var(--pf-t--global--text--color--subtle)' }}>
                   {topOwner?.kind && <>{topOwner.kind} · </>}{workload.metadata.name}
                 </span>
               </>
@@ -69,140 +71,139 @@ const WorkloadDrawer: React.FC<WorkloadDrawerProps> = ({
         </DrawerActions>
       </DrawerHead>
 
-            <Stack hasGutter style={{ padding: '1rem' }}>
-              {/* Queue position / scheduling info */}
-              <StackItem>
-                <Title headingLevel="h3">Scheduling Status</Title>
-              </StackItem>
-              <StackItem>
-                <DescriptionList isCompact>
-                  <DescriptionListGroup>
-                    <DescriptionListTerm>Phase</DescriptionListTerm>
-                    <DescriptionListDescription>
-                      <PhaseLabel phase={info.phase} />
-                    </DescriptionListDescription>
-                  </DescriptionListGroup>
-                  <DescriptionListGroup>
-                    <DescriptionListTerm>Local Queue</DescriptionListTerm>
-                    <DescriptionListDescription>
-                      <Label color="blue" isCompact>{workload.spec.queueName}</Label>
-                      {workload.metadata.namespace && (
-                        <span style={{ marginLeft: '0.5rem', color: '#6a6e73', fontSize: '0.85em' }}>
-                          ({workload.metadata.namespace})
-                        </span>
-                      )}
-                    </DescriptionListDescription>
-                  </DescriptionListGroup>
-                  <DescriptionListGroup>
-                    <DescriptionListTerm>ClusterQueue</DescriptionListTerm>
-                    <DescriptionListDescription>
-                      {inferredCQ ? (
-                        <>
-                          <Label color="red" isCompact>{inferredCQ}</Label>
-                          {!workload.status?.admission?.clusterQueue && (
-                            <span style={{ fontSize: '0.8em', color: '#6a6e73', marginLeft: '0.4rem' }}>
-                              (via LocalQueue, not yet admitted)
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <span style={{ color: '#6a6e73' }}>Unknown</span>
-                      )}
-                    </DescriptionListDescription>
-                  </DescriptionListGroup>
-                  {info.phase === 'Pending' && info.queuePosition !== null && (
-                    <DescriptionListGroup>
-                      <DescriptionListTerm>Queue position</DescriptionListTerm>
-                      <DescriptionListDescription>
-                        <strong>#{info.queuePosition}</strong>
-                        <span style={{ color: '#6a6e73', marginLeft: '0.5rem' }}>
-                          ({info.workloadsAhead} workload{info.workloadsAhead !== 1 ? 's' : ''} ahead)
-                        </span>
-                      </DescriptionListDescription>
-                    </DescriptionListGroup>
-                  )}
-                  <DescriptionListGroup>
-                    <DescriptionListTerm>Borrowing</DescriptionListTerm>
-                    <DescriptionListDescription>
-                      {info.isBorrowing ? (
-                        <Label color="orange" isCompact>
-                          Yes{info.borrowingFrom ? ` — from cohort "${info.borrowingFrom}"` : ''}
-                        </Label>
-                      ) : (
-                        <span style={{ color: '#6a6e73' }}>No</span>
-                      )}
-                    </DescriptionListDescription>
-                  </DescriptionListGroup>
-                  <DescriptionListGroup>
-                    <DescriptionListTerm>Priority</DescriptionListTerm>
-                    <DescriptionListDescription>
-                      {workload.spec.priority !== undefined ? (
-                        <>
-                          {workload.spec.priority}
-                          {workload.spec.priorityClassName && (
-                            <Label isCompact style={{ marginLeft: '0.5rem' }}>{workload.spec.priorityClassName}</Label>
-                          )}
-                        </>
-                      ) : workload.spec.priorityClassName ?? '—'}
-                    </DescriptionListDescription>
-                  </DescriptionListGroup>
-                    <ResourcesRequested workload={workload} />
-              </DescriptionList>
-              </StackItem>
+      <Stack hasGutter style={{ padding: 'var(--pf-t--global--spacer--md)' }}>
+        {/* Queue position / scheduling info */}
+        <StackItem>
+          <Title headingLevel="h3">Scheduling Status</Title>
+        </StackItem>
+        <StackItem>
+          <DescriptionList isCompact>
+            <DescriptionListGroup>
+              <DescriptionListTerm>Phase</DescriptionListTerm>
+              <DescriptionListDescription>
+                <PhaseLabel phase={info.phase} />
+              </DescriptionListDescription>
+            </DescriptionListGroup>
+            <DescriptionListGroup>
+              <DescriptionListTerm>Local Queue</DescriptionListTerm>
+              <DescriptionListDescription>
+                <Label color="blue" isCompact>{workload.spec.queueName}</Label>
+                {workload.metadata.namespace && (
+                  <span style={{ marginLeft: 'var(--pf-t--global--spacer--sm)', color: 'var(--pf-t--global--text--color--subtle)', fontSize: '0.85em' }}>
+                    ({workload.metadata.namespace})
+                  </span>
+                )}
+              </DescriptionListDescription>
+            </DescriptionListGroup>
+            <DescriptionListGroup>
+              <DescriptionListTerm>ClusterQueue</DescriptionListTerm>
+              <DescriptionListDescription>
+                {inferredCQ ? (
+                  <>
+                    <Label color="red" isCompact>{inferredCQ}</Label>
+                    {!workload.status?.admission?.clusterQueue && (
+                      <span style={{ fontSize: '0.8em', color: 'var(--pf-t--global--text--color--subtle)', marginLeft: 'var(--pf-t--global--spacer--xs)' }}>
+                        (via LocalQueue, not yet admitted)
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span style={{ color: 'var(--pf-t--global--text--color--subtle)' }}>Unknown</span>
+                )}
+              </DescriptionListDescription>
+            </DescriptionListGroup>
+            {info.phase === 'Pending' && info.queuePosition !== null && (
+              <DescriptionListGroup>
+                <DescriptionListTerm>Queue position</DescriptionListTerm>
+                <DescriptionListDescription>
+                  <strong>#{info.queuePosition}</strong>
+                  <span style={{ color: 'var(--pf-t--global--text--color--subtle)', marginLeft: 'var(--pf-t--global--spacer--sm)' }}>
+                    ({info.workloadsAhead} workload{info.workloadsAhead !== 1 ? 's' : ''} ahead)
+                  </span>
+                </DescriptionListDescription>
+              </DescriptionListGroup>
+            )}
+            <DescriptionListGroup>
+              <DescriptionListTerm>Borrowing</DescriptionListTerm>
+              <DescriptionListDescription>
+                {info.isBorrowing ? (
+                  <Label color="orange" isCompact>
+                    Yes{info.borrowingFrom ? ` — from cohort "${info.borrowingFrom}"` : ''}
+                  </Label>
+                ) : (
+                  <span style={{ color: 'var(--pf-t--global--text--color--subtle)' }}>No</span>
+                )}
+              </DescriptionListDescription>
+            </DescriptionListGroup>
+            <DescriptionListGroup>
+              <DescriptionListTerm>Priority</DescriptionListTerm>
+              <DescriptionListDescription>
+                {workload.spec.priority !== undefined ? (
+                  <>
+                    {workload.spec.priority}
+                    {workload.spec.priorityClassName && (
+                      <Label isCompact style={{ marginLeft: 'var(--pf-t--global--spacer--sm)' }}>{workload.spec.priorityClassName}</Label>
+                    )}
+                  </>
+                ) : workload.spec.priorityClassName ?? '—'}
+              </DescriptionListDescription>
+            </DescriptionListGroup>
+            <ResourcesRequested workload={workload} />
+          </DescriptionList>
+        </StackItem>
 
-              {/* Why pending? */}
-              {info.phase === 'Pending' && (
-                <>
-                  <StackItem><Divider /></StackItem>
-                  <StackItem>
-                    <Title headingLevel="h3">Why is this pending?</Title>
-                  </StackItem>
-                  <StackItem>
-                    <WhyPending
-                      workload={workload}
-                      clusterQueues={clusterQueues}
-                      localQueues={localQueues}
-                      queuePosition={info.queuePosition}
-                      workloadsAhead={info.workloadsAhead}
-                    />
-                  </StackItem>
-                </>
-              )}
+        {/* Why pending? */}
+        {info.phase === 'Pending' && (
+          <>
+            <StackItem><Divider /></StackItem>
+            <StackItem>
+              <Title headingLevel="h3">Why is this pending?</Title>
+            </StackItem>
+            <StackItem>
+              <WhyPending
+                workload={workload}
+                clusterQueues={clusterQueues}
+                localQueues={localQueues}
+                queuePosition={info.queuePosition}
+                workloadsAhead={info.workloadsAhead}
+              />
+            </StackItem>
+          </>
+        )}
 
-              {/* Flavor assignments */}
-              {workload.status?.admission?.podSetAssignments && (
-                <>
-                  <StackItem><Divider /></StackItem>
-                  <StackItem>
-                    <Title headingLevel="h3">Flavor Assignments</Title>
-                  </StackItem>
-                  <StackItem>
-                    {workload.status.admission.podSetAssignments.map((psa) => (
-                      <div key={psa.name} style={{ marginBottom: '0.5rem' }}>
-                        <strong>{psa.name}</strong>
-                        <LabelGroup style={{ marginTop: '0.25rem' }}>
-                          {Object.entries(psa.flavors).map(([resource, flavor]) => (
-                            <Label key={resource} color="green" isCompact>
-                              {resource}: {flavor}
-                            </Label>
-                          ))}
-                        </LabelGroup>
-                      </div>
+        {/* Flavor assignments */}
+        {workload.status?.admission?.podSetAssignments && (
+          <>
+            <StackItem><Divider /></StackItem>
+            <StackItem>
+              <Title headingLevel="h3">Flavor Assignments</Title>
+            </StackItem>
+            <StackItem>
+              {workload.status.admission.podSetAssignments.map((psa) => (
+                <div key={psa.name} style={{ marginBottom: 'var(--pf-t--global--spacer--sm)' }}>
+                  <strong>{psa.name}</strong>
+                  <LabelGroup style={{ marginTop: 'var(--pf-t--global--spacer--xs)' }}>
+                    {Object.entries(psa.flavors).map(([resource, flavor]) => (
+                      <Label key={resource} color="green" isCompact>
+                        {resource}: {flavor}
+                      </Label>
                     ))}
-                  </StackItem>
-                </>
-              )}
+                  </LabelGroup>
+                </div>
+              ))}
+            </StackItem>
+          </>
+        )}
 
-              {/* Lifecycle timeline */}
-              <StackItem><Divider /></StackItem>
-              <StackItem>
-                <Title headingLevel="h3">Lifecycle Timeline</Title>
-              </StackItem>
-              <StackItem>
-                <Timeline conditions={conditions} startTime={workload.status?.startTime} />
-              </StackItem>
-
-            </Stack>
+        {/* Lifecycle timeline */}
+        <StackItem><Divider /></StackItem>
+        <StackItem>
+          <Title headingLevel="h3">Lifecycle Timeline</Title>
+        </StackItem>
+        <StackItem>
+          <Timeline conditions={conditions} />
+        </StackItem>
+      </Stack>
     </DrawerPanelContent>
   );
 };
@@ -232,15 +233,15 @@ const ResourcesRequested: React.FC<{ workload: Workload }> = ({ workload }) => {
             <DescriptionListTerm>{label}</DescriptionListTerm>
             <DescriptionListDescription>
               {entries.length === 0 ? (
-                <span style={{ color: '#6a6e73' }}>—</span>
+                <span style={{ color: 'var(--pf-t--global--text--color--subtle)' }}>—</span>
               ) : (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                <LabelGroup>
                   {entries.map(([res, qty]) => (
                     <Label key={res} color="grey" isCompact>
-                      {res}: <strong style={{ marginLeft: 3 }}>{qty}</strong>
+                      {res}: <strong style={{ marginLeft: 'var(--pf-t--global--spacer--xs)' }}>{qty}</strong>
                     </Label>
                   ))}
-                </div>
+                </LabelGroup>
               )}
             </DescriptionListDescription>
           </DescriptionListGroup>
@@ -331,58 +332,33 @@ const WhyPending: React.FC<{
 
 const CONDITION_ORDER = ['QuotaReserved', 'Admitted', 'PodsReady', 'Finished'];
 
-const Timeline: React.FC<{ conditions: Condition[]; startTime?: string }> = ({ conditions }) => {
-  const events: Array<{ label: string; time: string; done: boolean }> = [
-    { label: 'Submitted', time: '', done: true },
+const Timeline: React.FC<{ conditions: Condition[] }> = ({ conditions }) => {
+  const events = [
+    { label: 'Submitted', done: true, time: '' },
+    ...CONDITION_ORDER.map((condName) => {
+      const cond = conditions.find((c) => c.type === condName);
+      return {
+        label: condName,
+        done: cond?.status === 'True',
+        time: cond?.lastTransitionTime ?? '',
+      };
+    }),
   ];
 
-  for (const condName of CONDITION_ORDER) {
-    const cond = conditions.find((c) => c.type === condName);
-    events.push({
-      label: condName,
-      time: cond?.lastTransitionTime ?? '',
-      done: cond?.status === 'True',
-    });
-  }
-
   return (
-    <div>
+    <ProgressStepper isVertical>
       {events.map((e, i) => (
-        <div
+        <ProgressStep
           key={i}
-          style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            marginBottom: '0.75rem',
-          }}
+          variant={e.done ? 'success' : 'pending'}
+          id={`timeline-step-${i}`}
+          titleId={`timeline-title-${i}`}
+          description={e.time ? new Date(e.time).toLocaleString() : undefined}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginRight: '0.75rem' }}>
-            <div
-              style={{
-                width: 12,
-                height: 12,
-                borderRadius: '50%',
-                background: e.done ? '#3E8635' : '#d2d2d2',
-                flexShrink: 0,
-              }}
-            />
-            {i < events.length - 1 && (
-              <div style={{ width: 2, height: 20, background: '#d2d2d2', margin: '2px 0' }} />
-            )}
-          </div>
-          <div>
-            <div style={{ fontWeight: e.done ? 600 : 400, color: e.done ? 'inherit' : '#6a6e73' }}>
-              {e.label}
-            </div>
-            {e.time && (
-              <div style={{ fontSize: '0.8em', color: '#6a6e73' }}>
-                {new Date(e.time).toLocaleString()}
-              </div>
-            )}
-          </div>
-        </div>
+          {e.label}
+        </ProgressStep>
       ))}
-    </div>
+    </ProgressStepper>
   );
 };
 

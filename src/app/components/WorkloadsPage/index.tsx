@@ -95,7 +95,7 @@ const WorkloadsPage: React.FC = () => {
   return (
     <>
       <PageSection>
-        <Title headingLevel="h1">Kueue Visualizer — Workloads</Title>
+        <Title headingLevel="h1">Workloads</Title>
       </PageSection>
 
       {error && (
