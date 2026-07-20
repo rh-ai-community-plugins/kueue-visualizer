@@ -12,22 +12,24 @@ maintainer:                          # [PLUGIN-SPECIFIC]
 # --- RHOAI compatibility (required) ---
 rhoai_compatibility:
   min_version: "3.3.0"
-  tested_versions: ["3.3.0"]
+  tested_versions: ["3.3.0", "3.4.0"]
 
 # --- Deployment (required) ---
 deployment_model: cluster-shared     # per-project | cluster-shared | both
 
 image:                               # [PLUGIN-SPECIFIC]
-  repository: quay.io/rlundber/kueue-plugin
-  tag: "latest"
+  repository: quay.io/rh-ai-community-plugins/kueue-plugin
+  tag: "0.1.0"
 
 # --- Installation (required) ---
 install:
   method: manual
   helm:
     chart_path: chart/
-  prerequisites: []
-  instructions: https://github.com/rh-ai-community-plugins/kueue-plugin
+    registry: oci://quay.io/rh-ai-community-plugins/kueue-plugin-chart  # [PLUGIN-SPECIFIC]
+  prerequisites:
+    - Kueue installed on the cluster
+  instructions: https://github.com/rh-ai-community-plugins/kueue-plugin/blob/main/README.md
 
 # --- Dashboard integration (required) ---
 remote:
@@ -53,4 +55,5 @@ rbac:
 # --- Support (optional) ---
 support:
   repo: https://github.com/rh-ai-community-plugins/kueue-plugin
+  docs: https://github.com/rh-ai-community-plugins/kueue-plugin/blob/main/README.md
   issues: https://github.com/rh-ai-community-plugins/kueue-plugin/issues

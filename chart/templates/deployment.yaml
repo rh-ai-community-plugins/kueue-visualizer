@@ -3,26 +3,28 @@ kind: Deployment
 metadata:
   name: {{ include "kueue-plugin.fullname" . }}
   labels:
-    app: {{ include "kueue-plugin.fullname" . }}
+    {{- include "kueue-plugin.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app: {{ include "kueue-plugin.fullname" . }}
+      {{- include "kueue-plugin.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        app: {{ include "kueue-plugin.fullname" . }}
+        {{- include "kueue-plugin.selectorLabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "kueue-plugin.serviceAccountName" . }}
       securityContext:
-        runAsNonRoot: true
+        {{- toYaml .Values.securityContext | nindent 8 }}
       containers:
-        - name: kueue-plugin
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        - name: {{ include "kueue-plugin.name" . }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            - containerPort: {{ .Values.service.targetPort }}
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -32,10 +34,10 @@ spec:
           livenessProbe:
             httpGet:
               path: /
-              port: {{ .Values.service.targetPort }}
+              port: http
           readinessProbe:
             httpGet:
               path: /
-              port: {{ .Values.service.targetPort }}
+              port: http
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

@@ -1,7 +1,15 @@
 image:
   repository: quay.io/rh-ai-community-plugins/kueue-plugin
-  tag: latest
-  pullPolicy: Always
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# Overrides .Chart.Name — set if release name differs from chart name
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
 
 replicaCount: 1
 
@@ -23,11 +31,6 @@ resources:
 
 securityContext:
   runAsNonRoot: true
-  runAsUser: 1001
-
-serviceAccount:
-  create: true
-  name: ""
 
 rbac:
   create: true

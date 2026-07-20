@@ -5,106 +5,40 @@ A community plugin for the Red Hat OpenShift AI (RHOAI) Dashboard that provides 
 ## Features
 
 **Queue Infrastructure page**
+
 - Interactive topology graph: LocalQueue → ClusterQueue → Cohort, with ResourceFlavors as leaf nodes
 - Click any node for a detail panel: capacity bars, preemption policy, flavor quotas
-- Kueue-managed namespaces table (expandable per-namespace LocalQueue breakdown)
 - Cohort borrowing ledger: nominal vs. used vs. borrowed per resource dimension
+- Namespaces table with per-namespace LocalQueue breakdown
 
 **Workloads page**
+
 - Filterable workload table with queue position, borrow status, and priority
 - Per-workload drawer: scheduling status, flavor assignments, lifecycle timeline, condition warnings
 
 ---
 
-## Architecture
+## Quick Start
 
-This plugin uses [Module Federation](https://webpack.js.org/concepts/module-federation/) — the same mechanism RHOAI uses internally for its own sub-plugins (modelRegistry, genAi, mlflow, etc.). The plugin is a separately deployed React app that the RHOAI dashboard backend proxies to and injects into the browser at runtime. No changes to the dashboard source code are required.
+### Deploy on an Existing Dashboard
 
-### How RHOAI loads Module Federation plugins
+**Prerequisites:** Helm 3, `oc` CLI access, Kueue installed on the cluster, access to `redhat-ods-applications` namespace (requires cluster-admin).
 
-This is the chain we reverse-engineered from the running dashboard pod:
-
-```
-federation-config ConfigMap
-    ↓  (mounted as env var)
-MODULE_FEDERATION_CONFIG on rhods-dashboard Deployment
-    ↓  (read by Node.js backend at startup)
-Backend registers /_mf/{name} proxy routes → proxies to your service
-    ↓  (on every page request)
-Backend renders index.html, filling <?- mfRemotesJson ?> with plugin list
-    ↓  (in the browser)
-<script id="mf-remotes-json"> parsed by frontend JS
-    ↓
-Frontend dynamically fetches /_mf/kueuePlugin/remoteEntry.js
-    ↓
-Module Federation loads ./extensions → registers nav item + route in the dashboard
-```
-
-Key files inside the dashboard pod (`/usr/src/app`):
-- `packages/app-config/dist/module-federation.js` — parses `MODULE_FEDERATION_CONFIG`
-- `backend/dist/routes/module-federation.js` — registers `/_mf/{name}` proxy routes
-- `frontend/public/index.html` — contains `<?- mfRemotesJson ?>` server-side template
-
-### Why the ConfigMap approach doesn't work
-
-The `federation-config` ConfigMap is owned by the `default-dashboard` Dashboard CR, which is in turn owned by the `default-dsc` DataScienceCluster CR. The ODH operator reconciles the ConfigMap back to its desired state within seconds of any manual change. Setting `managementState: Unmanaged` on the Dashboard CR annotation is not honored in RHOAI 3.4.0.
-
-### The working approach: set the env var directly on the Deployment
-
-Instead of modifying the ConfigMap, set `MODULE_FEDERATION_CONFIG` as a plain env var value directly on the `rhods-dashboard` Deployment. This overrides the `configMapKeyRef` and survives ConfigMap reconciliation. The operator reconciles the Deployment less aggressively (only on Dashboard CR generation changes), so the value persists across normal operation.
-
----
-
-## Prerequisites
-
-- RHOAI 3.4.0+ cluster with `oc` access
-- Kueue installed on the cluster
-- Helm 3
-- Podman or Docker
-
----
-
-## Build & Push
+#### 1. Install the plugin
 
 ```bash
-cd kueue-plugin
-npm install
-npm run build
-
-podman build . -t quay.io/<your-org>/kueue-plugin:0.1
-podman push quay.io/<your-org>/kueue-plugin:0.1
-```
-
----
-
-## Deploy
-
-### 1. Helm install
-
-```bash
-# Export your active kubeconfig context (needed if helm can't resolve the context name)
-oc config view --minify --raw > /tmp/active-kubeconfig.yaml
-
-helm install kueue-plugin ./chart \
+helm install kueue-plugin chart/ \
   --namespace kueue-project \
-  --create-namespace \
-  --set image.repository=quay.io/<your-org>/kueue-plugin \
-  --set image.tag=0.1 \
-  --kubeconfig /tmp/active-kubeconfig.yaml
+  --create-namespace
 ```
 
-This creates:
-- `Deployment` + `Service` (ClusterIP on port 8080)
-- `ClusterRole` + `ClusterRoleBinding` granting `get/list/watch` on Kueue resources and namespaces
-- `ServiceAccount`
-- `Route` (TLS edge termination) — for direct access and as fallback
+This creates a Deployment, Service, ClusterRole + ClusterRoleBinding (read-only Kueue resources), ServiceAccount, and an OpenShift Route.
 
-### 2. Register with the RHOAI dashboard
+#### 2. Register with the RHOAI Dashboard
 
-Get the current `MODULE_FEDERATION_CONFIG` from the running ConfigMap, append the kueuePlugin entry, and set it directly on the Deployment:
+Retrieve the current Module Federation configuration, append the kueuePlugin entry, and apply it directly to the dashboard Deployment:
 
 ```bash
-# 1. Fetch and extend the config
 oc get configmap federation-config \
   -n redhat-ods-applications \
   -o jsonpath='{.data.module-federation-config\.json}' \
@@ -113,70 +47,107 @@ import json, sys
 config = json.load(sys.stdin)
 config.append({
   'name': 'kueuePlugin',
-  'remoteEntry': '/remoteEntry.js',
-  'authorize': False,
-  'tls': False,
-  'service': {
-    'name': 'kueue-plugin-kueue-plugin',
-    'namespace': 'kueue-project',
-    'port': 8080
+  'backend': {
+    'remoteEntry': '/remoteEntry.js',
+    'authorize': False,
+    'tls': False,
+    'service': {
+      'name': 'kueue-plugin',
+      'namespace': 'kueue-project',
+      'port': 8080
+    }
   }
 })
 print(json.dumps(config))
 " > /tmp/mf-config-extended.json
 
-# 2. Set it directly on the Deployment (bypasses the ConfigMap)
 oc set env deployment/rhods-dashboard \
   -n redhat-ods-applications \
   "MODULE_FEDERATION_CONFIG=$(cat /tmp/mf-config-extended.json)"
 ```
 
-The dashboard will roll out new pods automatically. After rollout (~2 min), reload the RHOAI dashboard — **Kueue: Queue Infrastructure** and **Kueue: Workloads** will appear in the sidebar.
+New dashboard pods roll out automatically. After roughly two minutes, reload the RHOAI dashboard — **Kueue > Queue Infrastructure** and **Kueue > Workloads** appear in the sidebar under **Community plugins**.
 
-### 3. Verify
+#### 3. Verify
 
 ```bash
-# Check the env var is set with kueuePlugin present
 oc set env deployment/rhods-dashboard -n redhat-ods-applications --list \
-  | grep MODULE_FEDERATION_CONFIG \
-  | python3 -c "import json,sys; d=json.loads(sys.stdin.read().split('=',1)[1]); print([e['name'] for e in d])"
+  | grep '^MODULE_FEDERATION_CONFIG=' \
+  | python3 -c "import json,sys; d=json.loads(sys.stdin.read().split('=',1)[1].strip()); print('\n'.join(e['name'] for e in d))"
+```
 
-# Check the backend proxy route is reachable (redirects to OAuth without a session, which is correct)
-curl -sk https://rh-ai.apps.<your-cluster>/_mf/kueuePlugin/remoteEntry.js | head -c 100
+You should see `kueuePlugin` in the output.
+
+---
+
+## Build & Push
+
+```bash
+npm install
+npm run build
+
+# Build and push (auto-computes next version from git tags)
+./scripts/build-push.sh
+
+# Or with an explicit version
+./scripts/build-push.sh 0.2.0
+```
+
+Or via Make:
+
+```bash
+make image-push VERSION=0.2.0
+```
+
+---
+
+## Deploy Custom Image
+
+```bash
+helm install kueue-plugin chart/ \
+  --namespace kueue-project \
+  --create-namespace \
+  --set image.repository=quay.io/<your-org>/kueue-plugin \
+  --set image.tag=0.2.0
 ```
 
 ---
 
 ## Upgrade
 
-To update the plugin image:
-
 ```bash
-podman build . -t quay.io/<your-org>/kueue-plugin:0.2
-podman push quay.io/<your-org>/kueue-plugin:0.2
-
-helm upgrade kueue-plugin ./chart \
+helm upgrade kueue-plugin chart/ \
   --namespace kueue-project \
-  --set image.repository=quay.io/<your-org>/kueue-plugin \
-  --set image.tag=0.2 \
-  --kubeconfig /tmp/active-kubeconfig.yaml
+  --set image.repository=quay.io/rh-ai-community-plugins/kueue-plugin \
+  --set image.tag=0.2.0
 ```
 
-The `MODULE_FEDERATION_CONFIG` env var on the Deployment does not need to be re-applied on image upgrades — only if the service name or namespace changes.
+The `MODULE_FEDERATION_CONFIG` env var on the dashboard Deployment only needs to be re-applied if the service name or namespace changes.
 
 ---
 
 ## Re-applying after operator reconciliation
 
-If the RHOAI operator reconciles the `rhods-dashboard` Deployment (e.g. after a RHOAI upgrade or DataScienceCluster change), it may restore `MODULE_FEDERATION_CONFIG` from the ConfigMap, dropping the kueuePlugin entry. Re-run step 2 above to restore it.
+If the RHOAI operator reconciles the `rhods-dashboard` Deployment (e.g. after a RHOAI upgrade), it may restore `MODULE_FEDERATION_CONFIG` from the ConfigMap, dropping the kueuePlugin entry. Re-run step 2 above to restore it.
 
-A long-term fix requires the ODH operator to support an extension point in `federation-config` for community plugins. This is tracked as TBD in the [rh-ai-community-plugins charter](https://github.com/rh-ai-community-plugins/charter).
+---
+
+## Development
+
+```bash
+npm install
+npm run start:dev     # Dev server on port 9500
+npm test              # Run tests
+npm run lint          # ESLint + markdownlint
+npm run typecheck     # TypeScript type check
+npm run validate      # typecheck + lint + test
+```
 
 ---
 
 ## RBAC
 
-The Helm chart creates a `ClusterRole` granting read-only access to:
+The Helm chart creates a ClusterRole granting read-only access to:
 
 ```yaml
 - apiGroups: [kueue.x-k8s.io]
@@ -192,7 +163,8 @@ The Helm chart creates a `ClusterRole` granting read-only access to:
 ## Security
 
 The plugin follows OpenShift `restricted-v2` SCC requirements:
-- `runAsNonRoot: true` (pod level) — OpenShift assigns a UID from the namespace's valid range
+
+- `runAsNonRoot: true` (pod level)
 - `allowPrivilegeEscalation: false` (container level)
 - `capabilities.drop: ["ALL"]` (container level)
 - `seccompProfile.type: RuntimeDefault` (container level)

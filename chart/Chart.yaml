@@ -4,3 +4,11 @@ description: Kueue visibility plugin for the RHOAI Dashboard
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
+keywords:
+  - rhoai
+  - openshift-ai
+  - plugin
+  - kueue
+home: https://github.com/rh-ai-community-plugins/kueue-plugin
+sources:
+  - https://github.com/rh-ai-community-plugins/kueue-plugin
