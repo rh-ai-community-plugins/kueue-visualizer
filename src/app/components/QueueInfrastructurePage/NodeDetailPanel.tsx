@@ -266,7 +266,7 @@ const LocalQueueDetail: React.FC<{ lq: LocalQueue; clusterQueues: ClusterQueue[]
           <DescriptionListGroup>
             <DescriptionListTerm>Bound to ClusterQueue</DescriptionListTerm>
             <DescriptionListDescription>
-              <Label color="red" isCompact>{lq.spec.clusterQueue}</Label>
+              <Label color="blue" isCompact>{lq.spec.clusterQueue}</Label>
             </DescriptionListDescription>
           </DescriptionListGroup>
           <DescriptionListGroup>
@@ -307,7 +307,7 @@ const FlavorDetail: React.FC<{ flavorName: string; clusterQueues: ClusterQueue[]
           .flatMap((fl) => fl.resources);
         return (
           <StackItem key={cq.metadata.name}>
-            <Label color="red" isCompact>{cq.metadata.name}</Label>
+            <Label color="blue" isCompact>{cq.metadata.name}</Label>
             {quotas.map((res) => (
               <div key={res.name} style={{ fontSize: '0.85em', paddingLeft: 'var(--pf-t--global--spacer--md)' }}>
                 {res.name}: {res.nominalQuota}
@@ -420,7 +420,7 @@ const CohortDetail: React.FC<{ cohortName: string; clusterQueues: ClusterQueue[]
                   <strong style={{ color: 'var(--pf-t--global--text--color--regular)' }}>{flavorName}</strong> · {resName}
                   {': '}{fmt(used, key)} / {fmt(nominal, key)}
                   {borrowed > 0 && (
-                    <Label color="orange" isCompact style={{ marginLeft: 'var(--pf-t--global--spacer--xs)' }}>
+                    <Label color="gold" isCompact style={{ marginLeft: 'var(--pf-t--global--spacer--xs)' }}>
                       {fmt(borrowed, key)} borrowed
                     </Label>
                   )}
@@ -459,17 +459,17 @@ const CohortDetail: React.FC<{ cohortName: string; clusterQueues: ClusterQueue[]
               style={{
                 padding: 'var(--pf-t--global--spacer--sm) var(--pf-t--global--spacer--sm)',
                 marginBottom: 'var(--pf-t--global--spacer--sm)',
-                border: `1px solid ${isBorrowing ? 'var(--pf-t--global--color--status--warning--default)' : isLending ? 'var(--pf-t--global--color--status--success--default)' : 'var(--pf-t--global--border--color--default)'}`,
+                border: `1px solid ${isBorrowing ? 'var(--pf-t--color--gold--40, #F0AB00)' : isLending ? 'var(--pf-t--global--color--status--success--default)' : 'var(--pf-t--global--border--color--default)'}`,
                 borderRadius: 6,
-                background: isBorrowing ? 'rgba(236,122,8,0.04)' : isLending ? 'rgba(62,134,53,0.04)' : 'var(--pf-t--global--background--color--secondary--default)',
+                background: isBorrowing ? 'rgba(240,171,0,0.06)' : isLending ? 'rgba(62,134,53,0.04)' : 'var(--pf-t--global--background--color--secondary--default)',
                 cursor: clickable ? 'pointer' : 'default',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--pf-t--global--spacer--xs)' }}>
-                <Label color="red" isCompact>{cq.metadata.name}</Label>
+                <Label color="blue" isCompact>{cq.metadata.name}</Label>
                 <div style={{ display: 'flex', gap: 'var(--pf-t--global--spacer--sm)', alignItems: 'center' }}>
                   {isBorrowing && (
-                    <span style={{ color: 'var(--pf-t--global--color--status--warning--default)', fontSize: '0.85em', fontWeight: 600 }}>
+                    <span style={{ color: 'var(--pf-t--color--gold--40, #795600)', fontSize: '0.85em', fontWeight: 600 }}>
                       ↗ {borrowParts.join(', ')}
                     </span>
                   )}
@@ -586,27 +586,27 @@ const UsageBar: React.FC<{
             <span style={{ color: 'var(--pf-t--global--color--status--success--default)' }}> + {fmtVal(lentVal)} lent</span>
           )}
           {' / '}{fmtVal(nominalVal)} nominal
-          <HelpTip content={`Scheduled (red): quota used by this queue's own admitted workloads.${lentVal > 0 ? ` Lent (green): spare nominal contributed to the cohort pool — may already be borrowed by another queue. Together they equal the ${fmtVal(nominalVal)} nominal total.` : ''}`} />
+          <HelpTip content={`Scheduled (blue): quota used by this queue's own admitted workloads.${lentVal > 0 ? ` Lent (green): spare nominal contributed to the cohort pool — may already be borrowed by another queue. Together they equal the ${fmtVal(nominalVal)} nominal total.` : ''}`} />
         </span>
       </div>
-      {/* Stacked bar: [red: own scheduled | green: lent to pool | grey: free] */}
+      {/* Stacked bar: [blue: own scheduled | green: lent to pool | grey: free] */}
       <div style={{ height: 10, borderRadius: 5, overflow: 'hidden', display: 'flex', background: 'var(--pf-t--global--background--color--secondary--default)' }}>
         {ownPctOfNominal > 0 && (
-          <div style={{ width: `${ownPctOfNominal}%`, background: 'var(--pf-t--global--color--status--danger--default)', flexShrink: 0 }} />
+          <div style={{ width: `${ownPctOfNominal}%`, background: 'var(--pf-t--color--blue--40)', flexShrink: 0 }} />
         )}
         {lentPctOfNominal > 0 && (
-          <div style={{ width: `${lentPctOfNominal}%`, background: 'var(--pf-t--global--color--status--success--default)', flexShrink: 0 }} />
+          <div style={{ width: `${lentPctOfNominal}%`, background: 'var(--pf-t--color--green--40)', flexShrink: 0 }} />
         )}
       </div>
       {/* Mini legend — only shown when lending is active */}
       {lentVal > 0 && (
         <div style={{ display: 'flex', gap: 'var(--pf-t--global--spacer--sm)', fontSize: '0.72em', color: 'var(--pf-t--global--text--color--subtle)', marginTop: 'var(--pf-t--global--spacer--xs)' }}>
           <span>
-            <span style={{ display: 'inline-block', width: 8, height: 8, background: 'var(--pf-t--global--color--status--danger--default)', borderRadius: 2, marginRight: 3, verticalAlign: 'middle' }} />
+            <span style={{ display: 'inline-block', width: 8, height: 8, background: 'var(--pf-t--color--blue--40)', borderRadius: 2, marginRight: 3, verticalAlign: 'middle' }} />
             scheduled
           </span>
           <span>
-            <span style={{ display: 'inline-block', width: 8, height: 8, background: 'var(--pf-t--global--color--status--success--default)', borderRadius: 2, marginRight: 3, verticalAlign: 'middle' }} />
+            <span style={{ display: 'inline-block', width: 8, height: 8, background: 'var(--pf-t--color--green--40)', borderRadius: 2, marginRight: 3, verticalAlign: 'middle' }} />
             lent to cohort
           </span>
         </div>
@@ -616,7 +616,7 @@ const UsageBar: React.FC<{
       {canBorrow && (
         <div style={{ marginTop: 'var(--pf-t--global--spacer--sm)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78em', marginBottom: 'var(--pf-t--global--spacer--xs)' }}>
-            <span style={{ color: isBorrowing ? 'var(--pf-t--global--color--status--warning--default)' : 'var(--pf-t--global--text--color--subtle)' }}>
+            <span style={{ color: isBorrowing ? 'var(--pf-t--color--gold--40, #795600)' : 'var(--pf-t--global--text--color--subtle)' }}>
               {isBorrowing ? '↗ borrowing' : 'borrowing capacity'}
             </span>
             <span style={{ color: 'var(--pf-t--global--text--color--subtle)' }}>
@@ -630,7 +630,7 @@ const UsageBar: React.FC<{
           </div>
           <div style={{ height: 6, borderRadius: 3, background: 'var(--pf-t--global--background--color--secondary--default)', overflow: 'hidden' }}>
             {borrowPct > 0 && (
-              <div style={{ width: `${borrowPct}%`, height: '100%', background: 'var(--pf-t--global--color--status--warning--default)' }} />
+              <div style={{ width: `${borrowPct}%`, height: '100%', background: 'var(--pf-t--color--gold--40, #F0AB00)' }} />
             )}
           </div>
         </div>
@@ -653,10 +653,10 @@ const HelpTip: React.FC<{ content: string }> = ({ content }) => (
   </Tooltip>
 );
 
-function kindColor(kind: string): 'blue' | 'red' | 'purple' | 'green' | 'grey' {
-  const map: Record<string, 'blue' | 'red' | 'purple' | 'green' | 'grey'> = {
-    LocalQueue: 'blue',
-    ClusterQueue: 'red',
+function kindColor(kind: string): 'cyan' | 'blue' | 'purple' | 'green' | 'grey' {
+  const map: Record<string, 'cyan' | 'blue' | 'purple' | 'green' | 'grey'> = {
+    LocalQueue: 'cyan',
+    ClusterQueue: 'blue',
     Cohort: 'purple',
     ResourceFlavor: 'green',
   };

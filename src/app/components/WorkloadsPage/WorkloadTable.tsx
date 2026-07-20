@@ -148,13 +148,13 @@ const WorkloadTable: React.FC<WorkloadTableProps> = ({
               <Td>
                 {(() => {
                   const admittedCQ = w.status?.admission?.clusterQueue;
-                  if (admittedCQ) return <Label color="red" isCompact>{admittedCQ}</Label>;
+                  if (admittedCQ) return <Label color="blue" isCompact>{admittedCQ}</Label>;
                   const lq = localQueues.find(
                     (l) => l.metadata.name === w.spec.queueName && l.metadata.namespace === w.metadata.namespace,
                   );
                   const inferredCQ = lq?.spec.clusterQueue;
                   return inferredCQ
-                    ? <><Label color="red" isCompact variant="outline">{inferredCQ}</Label></>
+                    ? <><Label color="blue" isCompact variant="outline">{inferredCQ}</Label></>
                     : <span style={{ color: 'var(--pf-t--global--text--color--subtle)' }}>—</span>;
                 })()}
               </Td>

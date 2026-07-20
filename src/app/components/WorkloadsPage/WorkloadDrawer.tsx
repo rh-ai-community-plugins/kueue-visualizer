@@ -87,7 +87,7 @@ const WorkloadDrawer: React.FC<WorkloadDrawerProps> = ({
             <DescriptionListGroup>
               <DescriptionListTerm>Local Queue</DescriptionListTerm>
               <DescriptionListDescription>
-                <Label color="blue" isCompact>{workload.spec.queueName}</Label>
+                <Label color="cyan" isCompact>{workload.spec.queueName}</Label>
                 {workload.metadata.namespace && (
                   <span style={{ marginLeft: 'var(--pf-t--global--spacer--sm)', color: 'var(--pf-t--global--text--color--subtle)', fontSize: '0.85em' }}>
                     ({workload.metadata.namespace})
@@ -100,7 +100,7 @@ const WorkloadDrawer: React.FC<WorkloadDrawerProps> = ({
               <DescriptionListDescription>
                 {inferredCQ ? (
                   <>
-                    <Label color="red" isCompact>{inferredCQ}</Label>
+                    <Label color="blue" isCompact>{inferredCQ}</Label>
                     {!workload.status?.admission?.clusterQueue && (
                       <span style={{ fontSize: '0.8em', color: 'var(--pf-t--global--text--color--subtle)', marginLeft: 'var(--pf-t--global--spacer--xs)' }}>
                         (via LocalQueue, not yet admitted)

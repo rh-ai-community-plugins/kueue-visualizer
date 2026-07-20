@@ -94,19 +94,19 @@ const CohortLedger: React.FC<CohortLedgerProps> = ({ clusterQueues }) => {
           return (
             <Tr key={i}>
               <Td><Label color="purple" isCompact>{row.cohort}</Label></Td>
-              <Td><Label color="red" isCompact>{row.clusterQueue}</Label></Td>
+              <Td><Label color="blue" isCompact>{row.clusterQueue}</Label></Td>
               <Td><Label color="green" isCompact>{row.flavor}</Label></Td>
               <Td>{row.resource}</Td>
               <Td>{row.nominal}</Td>
               <Td>{row.used}</Td>
               <Td>
                 {isBorrowing
-                  ? <Label color="orange" isCompact>{row.borrowed}</Label>
-                  : <span style={{ color: '#6a6e73' }}>0</span>}
+                  ? <Label color="gold" isCompact>{row.borrowed}</Label>
+                  : <span style={{ color: 'var(--pf-t--global--text--color--subtle)' }}>0</span>}
               </Td>
               <Td>{row.lendingLimit}</Td>
               <Td>
-                {isBorrowing && <Label color="orange" isCompact>Borrowing</Label>}
+                {isBorrowing && <Label color="gold" isCompact>Borrowing</Label>}
                 {isLending && !isBorrowing && <Label color="blue" isCompact>Lending available</Label>}
                 {!isBorrowing && !isLending && <Label color="grey" isCompact>Within nominal</Label>}
               </Td>

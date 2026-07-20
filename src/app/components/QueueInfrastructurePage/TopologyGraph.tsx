@@ -31,6 +31,7 @@ import {
 import type { ShapeProps, NodeModel, EdgeModel } from '@patternfly/react-topology';
 import type { ClusterQueue, LocalQueue, QueueTopologyNode } from '../../types/kueue';
 import { parseQuantity } from '../../utils/quantity';
+import './kueue-topology.css';
 
 // Module-level MobX observable for selection state.
 // Using this instead of relying on withSelection() → ShapeProps because:
@@ -46,12 +47,15 @@ const NODE_CLUSTER_QUEUE = 'ClusterQueue';
 const NODE_COHORT = 'Cohort';
 const NODE_FLAVOR = 'ResourceFlavor';
 
-const NODE_COLORS: Record<string, string> = {
-  [NODE_NAMESPACE]: 'var(--pf-t--global--color--status--warning--default)',
-  [NODE_LOCAL_QUEUE]: 'var(--pf-t--global--color--brand--default)',
-  [NODE_CLUSTER_QUEUE]: 'var(--pf-t--global--color--status--danger--default)',
-  [NODE_COHORT]: '#6A0080',
-  [NODE_FLAVOR]: 'var(--pf-t--global--color--status--success--default)',
+// Categorical hues aligned with RHOAI dashboard's vars.scss color system:
+//   orange → project/namespace, teal → pipeline/queue, blue → resource pool,
+//   purple → grouping/cohort, green → leaf resource/flavor
+const NODE_HUES: Record<string, string> = {
+  [NODE_NAMESPACE]: 'orange',
+  [NODE_LOCAL_QUEUE]: 'teal',
+  [NODE_CLUSTER_QUEUE]: 'blue',
+  [NODE_COHORT]: 'purple',
+  [NODE_FLAVOR]: 'green',
 };
 
 // Compute scheduled fraction (own workloads / nominal) for the most-saturated resource in a CQ.
@@ -175,11 +179,12 @@ function computeBorrowingLabel(cq: ClusterQueue): string | undefined {
   return `↗ ${parts.slice(0, 2).join(', ')}${parts.length > 2 ? '…' : ''}`;
 }
 
-// Build a colored shape with optional utilization bar, pending badge, and label rendered inside.
-// Rendering the label inside the shape (instead of relying on DefaultNode's external label)
-// gives consistent appearance regardless of hover/selection state.
+// Build a node shape using RHOAI-aligned hue classes from kueue-topology.css.
+// Light mode: pastel (--10) background + medium (--40) border + dark text
+// Dark mode:  saturated (--50) background + light (--30) border + light text
+// CSS class fill/stroke overrides SVG presentation attributes automatically.
 const makeShape = (
-  color: string,
+  hue: string,
   opts?: { badge?: boolean; utilBar?: boolean },
 ): React.FC<ShapeProps> => {
   const Shape: React.FC<ShapeProps> = observer(({ width, height, element }) => {
@@ -206,48 +211,48 @@ const makeShape = (
                 <rect x={0} y={0} width={width} height={height} rx={8} />
               </clipPath>
             </defs>
-            {/* Base background — moderate opacity so label stays readable even at 0% fill */}
-            <rect x={0} y={0} width={width} height={height} rx={8} fill={color} fillOpacity={0.45} stroke="none" />
-            {/* Scheduled segment */}
+            {/* Base background */}
+            <rect x={0} y={0} width={width} height={height} rx={8} className={`kueue-bg-${hue}`} stroke="none" />
+            {/* Scheduled segment — medium-intensity fill overlaid on base */}
             {scheduledPct > 0 && (
               <rect x={0} y={0} width={width * scheduledPct} height={height}
-                fill={color} fillOpacity={0.95} stroke="none" clipPath={`url(#${clipId})`} />
+                className={`kueue-util-${hue}`} stroke="none" clipPath={`url(#${clipId})`} />
             )}
-            {/* Lent-to-cohort segment (green) */}
+            {/* Lent-to-cohort segment — always green */}
             {lentPct > 0 && (
               <rect x={width * scheduledPct} y={0} width={width * lentPct} height={height}
-                fill="var(--pf-t--global--color--status--success--default)" fillOpacity={0.95} stroke="none" clipPath={`url(#${clipId})`} />
+                className="kueue-util-lent" stroke="none" clipPath={`url(#${clipId})`} />
             )}
             {/* Border */}
-            <rect x={0} y={0} width={width} height={height} rx={8} fill="none" stroke={color} strokeWidth={1.5} strokeOpacity={0.6} />
+            <rect x={0} y={0} width={width} height={height} rx={8} fill="none" className={`kueue-border-${hue}`} strokeWidth={1.5} />
           </>
         ) : (
-          <rect x={0} y={0} width={width} height={height} rx={8} fill={color} stroke="none" />
+          <>
+            <rect x={0} y={0} width={width} height={height} rx={8} className={`kueue-bg-${hue}`} stroke="none" />
+            <rect x={0} y={0} width={width} height={height} rx={8} fill="none" className={`kueue-border-${hue}`} strokeWidth={1.5} />
+          </>
         )}
-        {/* Label rendered inside the shape — avoids DefaultNode's hover-sensitive label background */}
+        {/* Label — kueue-node-label CSS class sets fill to global text token (dark/light per theme) */}
         <text
           x={width / 2}
           y={height / 2}
           textAnchor="middle"
           dominantBaseline="central"
-          fill="white"
-          stroke="rgba(0,0,0,0.35)"
-          strokeWidth={0.4}
-          paintOrder="stroke"
+          className="kueue-node-label"
           fontSize={11}
           fontWeight={selected ? 700 : 500}
           style={{ userSelect: 'none', pointerEvents: 'none' }}
         >
           {displayLabel}
         </text>
-        {/* Selection ring: gold outer border + colored inset ring */}
+        {/* Selection ring: gold outer glow + hue-colored inset */}
         {selected && (
           <>
             <rect x={0} y={0} width={width} height={height} rx={8} fill="none" stroke="#FFD700" strokeWidth={5} />
-            <rect x={3} y={3} width={width - 6} height={height - 6} rx={5} fill="none" stroke={color} strokeWidth={2} strokeOpacity={1} />
+            <rect x={3} y={3} width={width - 6} height={height - 6} rx={5} fill="none" className={`kueue-border-${hue}`} strokeWidth={2} />
           </>
         )}
-        {/* Pending badge */}
+        {/* Pending workloads badge */}
         {pending > 0 && (
           <>
             <circle cx={width - 10} cy={10} r={9} fill="var(--pf-t--global--color--status--warning--default)" stroke="white" strokeWidth={1.5} />
@@ -268,11 +273,11 @@ const makeShape = (
 
 // Stable module-level shape instances.
 const SHAPE_BY_KIND: Record<string, React.FC<ShapeProps>> = {
-  [NODE_NAMESPACE]: makeShape(NODE_COLORS[NODE_NAMESPACE]),
-  [NODE_LOCAL_QUEUE]: makeShape(NODE_COLORS[NODE_LOCAL_QUEUE], { badge: true }),
-  [NODE_CLUSTER_QUEUE]: makeShape(NODE_COLORS[NODE_CLUSTER_QUEUE], { badge: true, utilBar: true }),
-  [NODE_COHORT]: makeShape(NODE_COLORS[NODE_COHORT], { utilBar: true }),
-  [NODE_FLAVOR]: makeShape(NODE_COLORS[NODE_FLAVOR]),
+  [NODE_NAMESPACE]: makeShape(NODE_HUES[NODE_NAMESPACE]),
+  [NODE_LOCAL_QUEUE]: makeShape(NODE_HUES[NODE_LOCAL_QUEUE], { badge: true }),
+  [NODE_CLUSTER_QUEUE]: makeShape(NODE_HUES[NODE_CLUSTER_QUEUE], { badge: true, utilBar: true }),
+  [NODE_COHORT]: makeShape(NODE_HUES[NODE_COHORT], { utilBar: true }),
+  [NODE_FLAVOR]: makeShape(NODE_HUES[NODE_FLAVOR]),
 };
 
 const getCustomShape = (element: Node): React.FC<ShapeProps> =>
@@ -318,14 +323,14 @@ const BorrowingEdge = observer((props: any) => {
 
   return (
     <g>
-      {/* Orange edge line */}
-      <path d={pathD} stroke="var(--pf-t--global--color--status--warning--default)" strokeWidth={2.5} fill="none" />
+      {/* Gold edge line — distinct from orange pending badges */}
+      <path d={pathD} stroke="var(--pf-t--color--gold--40, #F0AB00)" strokeWidth={2.5} fill="none" />
       {/* Inline arrowhead polygon */}
-      <polygon points={`${tip.x},${tip.y} ${left.x},${left.y} ${right.x},${right.y}`} fill="var(--pf-t--global--color--status--warning--default)" />
+      <polygon points={`${tip.x},${tip.y} ${left.x},${left.y} ${right.x},${right.y}`} fill="var(--pf-t--color--gold--40, #F0AB00)" />
       {/* Pill label centered on longest segment */}
       {label && (
         <g transform={`translate(${midX}, ${midY})`}>
-          <rect x={-34} y={-9} width={68} height={18} rx={9} fill="var(--pf-t--global--color--status--warning--default)" />
+          <rect x={-34} y={-9} width={68} height={18} rx={9} fill="var(--pf-t--color--gold--40, #F0AB00)" />
           <text textAnchor="middle" dominantBaseline="central" fill="white" fontSize={10} fontWeight="bold">
             {label}
           </text>
@@ -366,10 +371,10 @@ const layoutFactory = (_type: string, graph: Graph): Layout =>
 // --- Legend ---
 
 const LEGEND_ENTRIES = [
-  { kind: 'Namespace', color: NODE_COLORS[NODE_NAMESPACE], desc: 'Kueue-managed namespace. Entry point for workload submission.' },
-  { kind: 'LocalQueue', color: NODE_COLORS[NODE_LOCAL_QUEUE], desc: 'Namespace-scoped queue. Users submit workloads here; maps to a ClusterQueue.' },
-  { kind: 'ClusterQueue', color: NODE_COLORS[NODE_CLUSTER_QUEUE], desc: 'Cluster-wide resource pool with defined quotas. Admits workloads from LocalQueues.' },
-  { kind: 'Cohort', color: NODE_COLORS[NODE_COHORT], desc: 'Group of ClusterQueues that can lend/borrow resources from each other.' },
+  { kind: 'Namespace', hue: NODE_HUES[NODE_NAMESPACE], desc: 'Kueue-managed namespace. Entry point for workload submission.' },
+  { kind: 'LocalQueue', hue: NODE_HUES[NODE_LOCAL_QUEUE], desc: 'Namespace-scoped queue. Users submit workloads here; maps to a ClusterQueue.' },
+  { kind: 'ClusterQueue', hue: NODE_HUES[NODE_CLUSTER_QUEUE], desc: 'Cluster-wide resource pool with defined quotas. Admits workloads from LocalQueues.' },
+  { kind: 'Cohort', hue: NODE_HUES[NODE_COHORT], desc: 'Group of ClusterQueues that can lend/borrow resources from each other.' },
 ];
 
 const TopologyLegend: React.FC = () => {
@@ -415,7 +420,8 @@ const TopologyLegend: React.FC = () => {
                   width: 12,
                   height: 12,
                   borderRadius: 2,
-                  background: e.color,
+                  background: `var(--pf-t--color--${e.hue}--40)`,
+                  border: `1px solid var(--pf-t--color--${e.hue}--40)`,
                   flexShrink: 0,
                   marginTop: 2,
                 }}
@@ -427,10 +433,10 @@ const TopologyLegend: React.FC = () => {
             </div>
           ))}
           <div style={{ color: 'var(--pf-t--global--text--color--subtle)', borderTop: '1px solid var(--pf-t--global--border--color--default)', paddingTop: 6, marginTop: 2 }}>
-            Orange badge = pending workloads. Fill shows utilization:{' '}
-            <span style={{ color: 'var(--pf-t--global--color--status--danger--default)', fontWeight: 600 }}>■</span> scheduled,{' '}
-            <span style={{ color: 'var(--pf-t--global--color--status--success--default)', fontWeight: 600 }}>■</span> lent to cohort pool.{' '}
-            <strong>↗</strong> = active borrowing.
+            <span style={{ color: 'var(--pf-t--global--color--status--warning--default)', fontWeight: 600 }}>●</span> badge = pending workloads.{' '}
+            Fill: <span style={{ color: `var(--pf-t--color--blue--40)`, fontWeight: 600 }}>■</span> scheduled,{' '}
+            <span style={{ color: `var(--pf-t--color--green--40)`, fontWeight: 600 }}>■</span> lent.{' '}
+            <span style={{ color: 'var(--pf-t--color--gold--40, #795600)', fontWeight: 600 }}>↗</span> = active borrowing.
           </div>
         </div>
       )}

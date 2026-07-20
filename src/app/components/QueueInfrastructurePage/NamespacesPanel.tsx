@@ -72,11 +72,11 @@ const NamespacesPanel: React.FC<NamespacesPanelProps> = ({ namespaces, localQueu
                 </Td>
                 <Td>
                   {nsLocalQueues.length === 0 ? (
-                    <span style={{ color: '#6a6e73' }}>None</span>
+                    <span style={{ color: 'var(--pf-t--global--text--color--subtle)' }}>None</span>
                   ) : (
                     <LabelGroup>
                       {nsLocalQueues.map((lq) => (
-                        <Label key={lq.metadata.name} color="blue" isCompact>
+                        <Label key={lq.metadata.name} color="cyan" isCompact>
                           {lq.metadata.name}
                         </Label>
                       ))}
@@ -85,11 +85,11 @@ const NamespacesPanel: React.FC<NamespacesPanelProps> = ({ namespaces, localQueu
                 </Td>
                 <Td>
                   {nsClusterQueues.length === 0 ? (
-                    <span style={{ color: '#6a6e73' }}>—</span>
+                    <span style={{ color: 'var(--pf-t--global--text--color--subtle)' }}>—</span>
                   ) : (
                     <LabelGroup>
                       {nsClusterQueues.map((cq) => (
-                        <Label key={cq.metadata.name} color="red" isCompact>
+                        <Label key={cq.metadata.name} color="blue" isCompact>
                           {cq.metadata.name}
                           {cq.spec.cohort && (
                             <span style={{ marginLeft: '0.3rem', opacity: 0.7 }}>
@@ -111,7 +111,7 @@ const NamespacesPanel: React.FC<NamespacesPanelProps> = ({ namespaces, localQueu
                     <Label color="orange" isCompact>{pending} pending</Label>
                   )}
                   {admitted === 0 && pending === 0 && (
-                    <span style={{ color: '#6a6e73' }}>0</span>
+                    <span style={{ color: 'var(--pf-t--global--text--color--subtle)' }}>0</span>
                   )}
                 </Td>
               </Tr>
@@ -133,7 +133,7 @@ const NamespacesPanel: React.FC<NamespacesPanelProps> = ({ namespaces, localQueu
                       <Tbody>
                         {nsLocalQueues.length === 0 ? (
                           <Tr>
-                            <Td colSpan={5} style={{ color: '#6a6e73' }}>
+                            <Td colSpan={5} style={{ color: 'var(--pf-t--global--text--color--subtle)' }}>
                               No LocalQueues in this namespace
                             </Td>
                           </Tr>
@@ -142,12 +142,12 @@ const NamespacesPanel: React.FC<NamespacesPanelProps> = ({ namespaces, localQueu
                             const cq = clusterQueues.find((c) => c.metadata.name === lq.spec.clusterQueue);
                             return (
                               <Tr key={lq.metadata.name}>
-                                <Td><Label color="blue" isCompact>{lq.metadata.name}</Label></Td>
-                                <Td><Label color="red" isCompact>{lq.spec.clusterQueue}</Label></Td>
+                                <Td><Label color="cyan" isCompact>{lq.metadata.name}</Label></Td>
+                                <Td><Label color="blue" isCompact>{lq.spec.clusterQueue}</Label></Td>
                                 <Td>
                                   {cq?.spec.cohort
                                     ? <Label color="purple" isCompact>{cq.spec.cohort}</Label>
-                                    : <span style={{ color: '#6a6e73' }}>—</span>}
+                                    : <span style={{ color: 'var(--pf-t--global--text--color--subtle)' }}>—</span>}
                                 </Td>
                                 <Td>{lq.status?.admittedWorkloads ?? 0}</Td>
                                 <Td>{lq.status?.pendingWorkloads ?? 0}</Td>

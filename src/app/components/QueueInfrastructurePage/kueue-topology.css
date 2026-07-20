@@ -1,0 +1,64 @@
+/*
+ * Kueue topology node styles — RHOAI-aligned color system.
+ *
+ * Follows the same hue-per-concept pattern as vars.scss in odh-dashboard:
+ *   orange → namespace / project
+ *   teal   → local queue / pipeline
+ *   blue   → cluster queue / resource pool
+ *   purple → cohort / grouping
+ *   green  → resource flavor / leaf resource
+ *
+ * Light mode: --10 (pastel) background, --40 border, regular text
+ * Dark mode:  --50 (saturated) background, --30 border (lighter than bg), regular text
+ */
+
+/* ── Node background fills ──────────────────────────────────────── */
+.kueue-bg-orange { fill: var(--pf-t--color--orange--10); }
+.kueue-bg-teal   { fill: var(--pf-t--color--teal--10); }
+.kueue-bg-blue   { fill: var(--pf-t--color--blue--10); }
+.kueue-bg-purple { fill: var(--pf-t--color--purple--10); }
+.kueue-bg-green  { fill: var(--pf-t--color--green--10); }
+
+/* ── Node border strokes ────────────────────────────────────────── */
+.kueue-border-orange { stroke: var(--pf-t--color--orange--40); }
+.kueue-border-teal   { stroke: var(--pf-t--color--teal--40); }
+.kueue-border-blue   { stroke: var(--pf-t--color--blue--40); }
+.kueue-border-purple { stroke: var(--pf-t--color--purple--40); }
+.kueue-border-green  { stroke: var(--pf-t--color--green--40); }
+
+/* ── Utilization bar fills (scheduled segment) ──────────────────── */
+/* Medium intensity — contrasts against --10 bg in light mode
+   and appears as a lighter stripe against --50 bg in dark mode   */
+.kueue-util-orange { fill: var(--pf-t--color--orange--30); }
+.kueue-util-teal   { fill: var(--pf-t--color--teal--30); }
+.kueue-util-blue   { fill: var(--pf-t--color--blue--30); }
+.kueue-util-purple { fill: var(--pf-t--color--purple--30); }
+.kueue-util-green  { fill: var(--pf-t--color--green--30); }
+
+/* Lent-to-cohort segment — always green regardless of node hue */
+.kueue-util-lent { fill: var(--pf-t--color--green--30); }
+
+/* ── Node label text ────────────────────────────────────────────── */
+/* Semantic token: dark in light mode, light in dark mode — no override needed */
+.kueue-node-label { fill: var(--pf-t--global--text--color--regular); }
+
+/* ── Dark mode overrides ────────────────────────────────────────── */
+/* orange/teal/green: --50 is saturated enough.
+   blue/purple: RHOAI vars.scss uses --40 (not 50) for these hues in dark mode
+   — --50 resolves too light on dark backgrounds.                              */
+:root:where(.pf-v6-theme-dark) .kueue-bg-orange { fill: var(--pf-t--color--orange--50); }
+:root:where(.pf-v6-theme-dark) .kueue-bg-teal   { fill: var(--pf-t--color--teal--50); }
+:root:where(.pf-v6-theme-dark) .kueue-bg-blue   { fill: var(--pf-t--color--blue--40); }
+:root:where(.pf-v6-theme-dark) .kueue-bg-purple { fill: var(--pf-t--color--purple--40); }
+:root:where(.pf-v6-theme-dark) .kueue-bg-green  { fill: var(--pf-t--color--green--50); }
+
+/* Borders lighter than the saturated background in dark mode */
+:root:where(.pf-v6-theme-dark) .kueue-border-orange { stroke: var(--pf-t--color--orange--30); }
+:root:where(.pf-v6-theme-dark) .kueue-border-teal   { stroke: var(--pf-t--color--teal--30); }
+:root:where(.pf-v6-theme-dark) .kueue-border-blue   { stroke: var(--pf-t--color--blue--20); }
+:root:where(.pf-v6-theme-dark) .kueue-border-purple { stroke: var(--pf-t--color--purple--20); }
+:root:where(.pf-v6-theme-dark) .kueue-border-green  { stroke: var(--pf-t--color--green--30); }
+
+/* Explicit white text in dark mode — don't rely on the global token
+   since SVG CSS resolution can be inconsistent across browsers.      */
+:root:where(.pf-v6-theme-dark) .kueue-node-label { fill: var(--pf-t--color--white); }
