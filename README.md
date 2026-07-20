@@ -32,7 +32,7 @@ helm install kueue-plugin chart/ \
   --create-namespace
 ```
 
-This creates a Deployment, Service, ClusterRole + ClusterRoleBinding (read-only Kueue resources), ServiceAccount, and an OpenShift Route.
+This creates a Deployment, Service, ServiceAccount, and an OpenShift Route.
 
 #### 2. Register with the RHOAI Dashboard
 
@@ -147,16 +147,25 @@ npm run validate      # typecheck + lint + test
 
 ## RBAC
 
-The Helm chart creates a ClusterRole granting read-only access to:
+The plugin uses the RHOAI dashboard's `/api/k8s` proxy, which makes API calls impersonating the logged-in user. No additional ClusterRole is created by the Helm chart.
 
-```yaml
-- apiGroups: [kueue.x-k8s.io]
-  resources: [localqueues, clusterqueues, workloads, resourceflavors]
-  verbs: [get, list, watch]
-- apiGroups: [""]
-  resources: [namespaces]
-  verbs: [get, list, watch]
+Users need read access to Kueue resources to use this plugin. This is provided by Kueue's built-in **`kueue-batch-user-role`** ClusterRole, which grants `get/list/watch` on `clusterqueues`, `localqueues`, and `workloads`.
+
+### Granting access
+
+In a future RHOAI release, this role will be granted automatically when a user is given distributed workloads access via the RHOAI dashboard. Until then, a cluster admin must grant it manually:
+
+```bash
+oc adm policy add-cluster-role-to-user kueue-batch-user-role <username>
 ```
+
+Or for all users in a group:
+
+```bash
+oc adm policy add-cluster-role-to-group kueue-batch-user-role <group-name>
+```
+
+Users without this role will see an explanatory message in the plugin instead of an error.
 
 ---
 

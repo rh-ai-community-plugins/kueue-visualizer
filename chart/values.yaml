@@ -32,5 +32,3 @@ resources:
 securityContext:
   runAsNonRoot: true
 
-rbac:
-  create: true

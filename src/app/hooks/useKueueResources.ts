@@ -76,8 +76,10 @@ export function useKueueNamespaces() {
     setLoading(true);
     setError(null);
     Promise.all([
-      fetch(`${K8S}${CORE_BASE}/namespaces?labelSelector=kueue-managed%3Dtrue`, { signal: controller.signal }).then((r) => r.json()),
-      fetch(`${K8S}${CORE_BASE}/namespaces?labelSelector=kueue.openshift.io%2Fmanaged%3Dtrue`, { signal: controller.signal }).then((r) => r.json()),
+      fetch(`${K8S}${CORE_BASE}/namespaces?labelSelector=kueue-managed%3Dtrue`, { signal: controller.signal })
+        .then((r) => { if (!r.ok) throw new Error(`${r.status} ${r.statusText}`); return r.json(); }),
+      fetch(`${K8S}${CORE_BASE}/namespaces?labelSelector=kueue.openshift.io%2Fmanaged%3Dtrue`, { signal: controller.signal })
+        .then((r) => { if (!r.ok) throw new Error(`${r.status} ${r.statusText}`); return r.json(); }),
     ])
       .then(([res1, res2]) => {
         const seen = new Set<string>();

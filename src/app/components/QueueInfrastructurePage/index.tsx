@@ -19,11 +19,10 @@ import {
 import {
   useClusterQueues,
   useLocalQueues,
-  useResourceFlavors,
-  useKueueNamespaces,
   useInterval,
 } from '../../hooks/useKueueResources';
 import { useLastSelectedProject } from '../../hooks/useLastSelectedProject';
+import { useProjects } from '../../hooks/useProjects';
 import { ProjectSelector } from '../ProjectSelector';
 import TopologyGraph from './TopologyGraph';
 import NodeDetailPanel from './NodeDetailPanel';
@@ -38,13 +37,28 @@ const QueueInfrastructurePage: React.FC = () => {
 
   const { clusterQueues, loading: cqLoading, error: cqError, refresh: refreshCQ } = useClusterQueues();
   const { localQueues, loading: lqLoading, error: lqError, refresh: refreshLQ } = useLocalQueues();
-  const { loading: flLoading, error: flError, refresh: refreshFl } = useResourceFlavors();
-  const { namespaces, loading: nsLoading, error: nsError, refresh: refreshNs } = useKueueNamespaces();
 
   // Shared project selection — persisted to localStorage key 'rhoai.last-selected-project'
   // so selection is remembered when navigating between Infrastructure and Workloads pages.
   const [selectedProject, setSelectedProject] = useLastSelectedProject();
   const filterNamespace = selectedProject ?? '';
+
+  // Limit "All projects" view to the namespaces the user actually has access to.
+  // kueue-batch-user-role is cluster-scoped, so cluster-wide API calls would otherwise
+  // return data from every namespace on the cluster.
+  const { projects } = useProjects();
+  const userNamespaces = new Set(projects.map((p) => p.metadata.name));
+  const visibleLocalQueues = filterNamespace
+    ? localQueues
+    : localQueues.filter((lq) => userNamespaces.has(lq.metadata.namespace ?? ''));
+
+  // Derive kueue-managed namespaces from local queues — any namespace with a local queue
+  // is effectively kueue-managed. Always scoped to the user's own projects regardless of
+  // the project dropdown (which only affects the topology graph).
+  const userLocalQueues = localQueues.filter((lq) => userNamespaces.has(lq.metadata.namespace ?? ''));
+  const namespaces = Array.from(
+    new Set(userLocalQueues.map((lq) => lq.metadata.namespace).filter(Boolean) as string[])
+  ).map((name) => ({ name, labels: {} }));
 
   const [selectedNode, setSelectedNode] = useState<QueueTopologyNode | null>(null);
   const [filterCQ, setFilterCQ] = useState('');
@@ -63,8 +77,6 @@ const QueueInfrastructurePage: React.FC = () => {
   useInterval(() => {
     refreshCQ();
     refreshLQ();
-    refreshFl();
-    refreshNs();
   }, REFRESH_INTERVAL_MS);
 
   // Auto-select a LocalQueue node when navigated here via ?lq= param (e.g. from Workloads table).
@@ -87,18 +99,29 @@ const QueueInfrastructurePage: React.FC = () => {
     }
   }, [localQueues, lqParam, filterNamespace]);
 
-  const loading = cqLoading || lqLoading || flLoading || nsLoading;
-  const error = cqError ?? lqError ?? flError ?? nsError;
+  const loading = cqLoading || lqLoading;
+  const accessDenied = (cqError ?? lqError)?.startsWith('403');
+  const error = accessDenied ? null : (cqError ?? lqError);
 
   // Only show spinner on initial load — background refreshes happen silently
   // so the topology graph zoom/pan state is preserved.
-  const hasData = clusterQueues.length > 0 || localQueues.length > 0 || namespaces.length > 0;
+  const hasData = clusterQueues.length > 0 || visibleLocalQueues.length > 0;
   const isInitialLoad = loading && !hasData;
 
   const cqOptions = clusterQueues.map((cq) => cq.metadata.name).sort();
 
   return (
     <>
+      {accessDenied && (
+        <PageSection>
+          <Alert variant="info" title="Kueue access required" isInline>
+            Your account does not have permission to read Kueue resources. Ask a cluster admin to
+            grant you the <strong>kueue-batch-user-role</strong> ClusterRole.
+            In a future RHOAI release this will be granted automatically when distributed workloads
+            access is enabled for your account.
+          </Alert>
+        </PageSection>
+      )}
       {error && (
         <PageSection>
           <Alert variant="danger" title="Failed to load Kueue resources" isInline>
@@ -164,7 +187,7 @@ const QueueInfrastructurePage: React.FC = () => {
               <SplitItem isFilled>
                 <TopologyGraph
                   clusterQueues={clusterQueues}
-                  localQueues={localQueues}
+                  localQueues={visibleLocalQueues}
                   filterNamespace={filterNamespace}
                   filterCQ={filterCQ}
                   onNodeSelect={setSelectedNode}
@@ -202,7 +225,7 @@ const QueueInfrastructurePage: React.FC = () => {
               <StackItem>
                 <NamespacesPanel
                   namespaces={namespaces}
-                  localQueues={localQueues}
+                  localQueues={userLocalQueues}
                   clusterQueues={clusterQueues}
                 />
               </StackItem>

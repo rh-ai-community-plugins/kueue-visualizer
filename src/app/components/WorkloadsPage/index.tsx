@@ -25,6 +25,7 @@ import {
   useWorkloadTopOwner,
 } from '../../hooks/useKueueResources';
 import { useLastSelectedProject } from '../../hooks/useLastSelectedProject';
+import { useProjects } from '../../hooks/useProjects';
 import { ProjectSelector } from '../ProjectSelector';
 import WorkloadTable from './WorkloadTable';
 import WorkloadDrawer from './WorkloadDrawer';
@@ -45,6 +46,9 @@ const WorkloadsPage: React.FC = () => {
   const [selectedProject, setSelectedProject] = useLastSelectedProject();
   const nsFilter = selectedProject ?? '';
 
+  const { projects } = useProjects();
+  const userNamespaces = new Set(projects.map((p) => p.metadata.name));
+
   const [selectedWorkload, setSelectedWorkload] = useState<Workload | null>(null);
   const [searchText, setSearchText] = useState(() => searchParams.get('queue') ?? '');
   const [cqFilter, setCqFilter] = useState(() => searchParams.get('cq') ?? '');
@@ -61,6 +65,7 @@ const WorkloadsPage: React.FC = () => {
 
   const filtered = workloads.filter((w) => {
     if (nsFilter && w.metadata.namespace !== nsFilter) return false;
+    if (!nsFilter && !userNamespaces.has(w.metadata.namespace ?? '')) return false;
     if (cqFilter) {
       const admittedCQ = w.status?.admission?.clusterQueue;
       if (admittedCQ !== cqFilter) {
@@ -98,11 +103,20 @@ const WorkloadsPage: React.FC = () => {
         <Title headingLevel="h1">Workloads</Title>
       </PageSection>
 
-      {error && (
+      {error?.startsWith('403') ? (
+        <PageSection>
+          <Alert variant="info" title="Kueue access required" isInline>
+            Your account does not have permission to read Kueue resources. Ask a cluster admin to
+            grant you the <strong>kueue-batch-user-role</strong> ClusterRole.
+            In a future RHOAI release this will be granted automatically when distributed workloads
+            access is enabled for your account.
+          </Alert>
+        </PageSection>
+      ) : error ? (
         <PageSection>
           <Alert variant="danger" title="Failed to load workloads" isInline>{error}</Alert>
         </PageSection>
-      )}
+      ) : null}
 
       <PageSection>
         <Toolbar>

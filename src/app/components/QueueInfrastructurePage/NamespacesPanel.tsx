@@ -29,8 +29,7 @@ const NamespacesPanel: React.FC<NamespacesPanelProps> = ({ namespaces, localQueu
     return (
       <EmptyState>
         <EmptyStateBody>
-          No namespaces found with <code>kueue-managed: true</code> or{' '}
-          <code>kueue.openshift.io/managed: true</code>.
+          No kueue-managed namespaces found. Namespaces appear here once they have a LocalQueue configured.
         </EmptyStateBody>
       </EmptyState>
     );
