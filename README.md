@@ -36,7 +36,7 @@ This creates a Deployment, Service, ServiceAccount, and an OpenShift Route.
 
 #### 2. Register with the RHOAI Dashboard
 
-Retrieve the current Module Federation configuration, append the kueuePlugin entry, and apply it directly to the dashboard Deployment:
+Retrieve the current Module Federation configuration, append the kueueVisualizer entry, and apply it directly to the dashboard Deployment:
 
 ```bash
 oc get configmap federation-config \
@@ -46,7 +46,7 @@ oc get configmap federation-config \
 import json, sys
 config = json.load(sys.stdin)
 config.append({
-  'name': 'kueuePlugin',
+  'name': 'kueueVisualizer',
   'backend': {
     'remoteEntry': '/remoteEntry.js',
     'authorize': False,
@@ -76,7 +76,7 @@ oc set env deployment/rhods-dashboard -n redhat-ods-applications --list \
   | python3 -c "import json,sys; d=json.loads(sys.stdin.read().split('=',1)[1].strip()); print('\n'.join(e['name'] for e in d))"
 ```
 
-You should see `kueuePlugin` in the output.
+You should see `kueueVisualizer` in the output.
 
 ---
 
@@ -128,7 +128,7 @@ The `MODULE_FEDERATION_CONFIG` env var on the dashboard Deployment only needs to
 
 ## Re-applying after operator reconciliation
 
-If the RHOAI operator reconciles the `rhods-dashboard` Deployment (e.g. after a RHOAI upgrade), it may restore `MODULE_FEDERATION_CONFIG` from the ConfigMap, dropping the kueuePlugin entry. Re-run step 2 above to restore it.
+If the RHOAI operator reconciles the `rhods-dashboard` Deployment (e.g. after a RHOAI upgrade), it may restore `MODULE_FEDERATION_CONFIG` from the ConfigMap, dropping the kueueVisualizer entry. Re-run step 2 above to restore it.
 
 ---
 

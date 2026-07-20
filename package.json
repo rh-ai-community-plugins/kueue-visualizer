@@ -4,7 +4,7 @@
   "description": "A Kueue visibility plugin for the RHOAI Dashboard",
   "private": true,
   "module-federation": {
-    "name": "kueuePlugin",
+    "name": "kueueVisualizer",
     "remoteEntry": "remoteEntry.js",
     "authorize": false,
     "tls": false,
