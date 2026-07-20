@@ -26,7 +26,7 @@ install:
   method: automatic
   helm:
     chart_path: chart/
-    registry: oci://quay.io/rh-ai-community-plugins/kueue-visualizer-chart  # [PLUGIN-SPECIFIC]
+    registry: oci://quay.io/rh-ai-community-plugins/kueue-visualizer-chart
   prerequisites:
     - Kueue installed on the cluster
   instructions: https://github.com/rh-ai-community-plugins/kueue-visualizer/blob/main/README.md

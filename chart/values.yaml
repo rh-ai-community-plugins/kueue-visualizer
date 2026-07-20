@@ -3,8 +3,8 @@ image:
   tag: ""
   pullPolicy: IfNotPresent
 
-# Overrides .Chart.Name — set if release name differs from chart name
-nameOverride: ""
+# Overrides .Chart.Name — keeps k8s resource names as kueue-visualizer despite chart being named kueue-visualizer-chart
+nameOverride: "kueue-visualizer"
 fullnameOverride: ""
 
 serviceAccount:
