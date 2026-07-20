@@ -59,6 +59,16 @@
 :root:where(.pf-v6-theme-dark) .kueue-border-purple { stroke: var(--pf-t--color--purple--20); }
 :root:where(.pf-v6-theme-dark) .kueue-border-green  { stroke: var(--pf-t--color--green--30); }
 
+/* Util bars in dark mode: semi-transparent black overlay is always
+   darker than the saturated node background, making the filled
+   segment read correctly left-to-right regardless of hue.           */
+:root:where(.pf-v6-theme-dark) .kueue-util-orange,
+:root:where(.pf-v6-theme-dark) .kueue-util-teal,
+:root:where(.pf-v6-theme-dark) .kueue-util-blue,
+:root:where(.pf-v6-theme-dark) .kueue-util-purple,
+:root:where(.pf-v6-theme-dark) .kueue-util-green,
+:root:where(.pf-v6-theme-dark) .kueue-util-lent   { fill: rgba(0, 0, 0, 0.35); }
+
 /* Explicit white text in dark mode — don't rely on the global token
    since SVG CSS resolution can be inconsistent across browsers.      */
 :root:where(.pf-v6-theme-dark) .kueue-node-label { fill: var(--pf-t--color--white); }
