@@ -4,14 +4,14 @@ A community plugin for the Red Hat OpenShift AI (RHOAI) Dashboard that provides 
 
 ## Features
 
-**Queue Infrastructure page**
+### Queue Infrastructure page
 
 - Interactive topology graph: LocalQueue → ClusterQueue → Cohort, with ResourceFlavors as leaf nodes
 - Click any node for a detail panel: capacity bars, preemption policy, flavor quotas
 - Cohort borrowing ledger: nominal vs. used vs. borrowed per resource dimension
 - Namespaces table with per-namespace LocalQueue breakdown
 
-**Workloads page**
+### Workloads page
 
 - Filterable workload table with queue position, borrow status, and priority
 - Per-workload drawer: scheduling status, flavor assignments, lifecycle timeline, condition warnings
