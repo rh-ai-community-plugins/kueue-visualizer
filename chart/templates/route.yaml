@@ -2,11 +2,11 @@
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: {{ include "kueue-plugin.fullname" . }}
+  name: {{ include "kueue-visualizer.fullname" . }}
 spec:
   to:
     kind: Service
-    name: {{ include "kueue-plugin.fullname" . }}
+    name: {{ include "kueue-visualizer.fullname" . }}
   port:
     targetPort: {{ .Values.service.targetPort }}
   tls:

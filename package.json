@@ -1,5 +1,5 @@
 {
-  "name": "kueue-plugin",
+  "name": "kueue-visualizer",
   "version": "0.1.0",
   "description": "A Kueue visibility plugin for the RHOAI Dashboard",
   "private": true,

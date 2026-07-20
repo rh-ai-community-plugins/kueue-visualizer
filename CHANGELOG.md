@@ -22,5 +22,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub Actions CI/CD workflows
 - Community plugin navigation section (shared `community-plugins` parent + `kueue` subsection)
 
-[Unreleased]: https://github.com/rh-ai-community-plugins/kueue-plugin/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/rh-ai-community-plugins/kueue-plugin/releases/tag/v0.1.0
+[Unreleased]: https://github.com/rh-ai-community-plugins/kueue-visualizer/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/rh-ai-community-plugins/kueue-visualizer/releases/tag/v0.1.0

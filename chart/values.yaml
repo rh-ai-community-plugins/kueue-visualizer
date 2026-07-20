@@ -1,5 +1,5 @@
 image:
-  repository: quay.io/rh-ai-community-plugins/kueue-plugin
+  repository: quay.io/rh-ai-community-plugins/kueue-visualizer
   tag: ""
   pullPolicy: IfNotPresent
 

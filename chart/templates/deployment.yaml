@@ -1,24 +1,24 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "kueue-plugin.fullname" . }}
+  name: {{ include "kueue-visualizer.fullname" . }}
   labels:
-    {{- include "kueue-plugin.labels" . | nindent 4 }}
+    {{- include "kueue-visualizer.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "kueue-plugin.selectorLabels" . | nindent 6 }}
+      {{- include "kueue-visualizer.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "kueue-plugin.selectorLabels" . | nindent 8 }}
+        {{- include "kueue-visualizer.selectorLabels" . | nindent 8 }}
     spec:
-      serviceAccountName: {{ include "kueue-plugin.serviceAccountName" . }}
+      serviceAccountName: {{ include "kueue-visualizer.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.securityContext | nindent 8 }}
       containers:
-        - name: {{ include "kueue-plugin.name" . }}
+        - name: {{ include "kueue-visualizer.name" . }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:

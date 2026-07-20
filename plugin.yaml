@@ -1,5 +1,5 @@
 # --- Plugin identity (required) ---
-name: kueue-plugin                   # [PLUGIN-SPECIFIC] unique plugin identifier (kebab-case)
+name: kueue-visualizer                   # [PLUGIN-SPECIFIC] unique plugin identifier (kebab-case)
 displayName: Kueue                   # [PLUGIN-SPECIFIC] human-readable name
 description: Kueue queue visibility for the RHOAI Dashboard — queue topology, workload scheduling status, cohort borrowing, and resource flavor mapping.
 version: 0.1.0
@@ -18,18 +18,18 @@ rhoai_compatibility:
 deployment_model: cluster-shared     # per-project | cluster-shared | both
 
 image:                               # [PLUGIN-SPECIFIC]
-  repository: quay.io/rh-ai-community-plugins/kueue-plugin
+  repository: quay.io/rh-ai-community-plugins/kueue-visualizer
   tag: "0.1.0"
 
 # --- Installation (required) ---
 install:
-  method: manual
+  method: automatic
   helm:
     chart_path: chart/
-    registry: oci://quay.io/rh-ai-community-plugins/kueue-plugin-chart  # [PLUGIN-SPECIFIC]
+    registry: oci://quay.io/rh-ai-community-plugins/kueue-visualizer-chart  # [PLUGIN-SPECIFIC]
   prerequisites:
     - Kueue installed on the cluster
-  instructions: https://github.com/rh-ai-community-plugins/kueue-plugin/blob/main/README.md
+  instructions: https://github.com/rh-ai-community-plugins/kueue-visualizer/blob/main/README.md
 
 # --- Dashboard integration (required) ---
 remote:
@@ -54,6 +54,6 @@ rbac:
 
 # --- Support (optional) ---
 support:
-  repo: https://github.com/rh-ai-community-plugins/kueue-plugin
-  docs: https://github.com/rh-ai-community-plugins/kueue-plugin/blob/main/README.md
-  issues: https://github.com/rh-ai-community-plugins/kueue-plugin/issues
+  repo: https://github.com/rh-ai-community-plugins/kueue-visualizer
+  docs: https://github.com/rh-ai-community-plugins/kueue-visualizer/blob/main/README.md
+  issues: https://github.com/rh-ai-community-plugins/kueue-visualizer/issues

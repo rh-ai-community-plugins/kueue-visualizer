@@ -21,7 +21,7 @@ usage() {
     cat <<EOF
 Usage: $(basename "$0") [SEVERITY]
 
-Build and scan the kueue-plugin container image for vulnerabilities using Trivy.
+Build and scan the kueue-visualizer container image for vulnerabilities using Trivy.
 
 Arguments:
   SEVERITY  Trivy severity filter (default: HIGH,CRITICAL)
@@ -38,7 +38,7 @@ EOF
 }
 
 # Image configuration
-image_name="kueue-plugin"
+image_name="kueue-visualizer"
 containerfile="Containerfile"
 context="."
 

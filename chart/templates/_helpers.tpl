@@ -1,16 +1,16 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "kueue-plugin.name" -}}
+{{- define "kueue-visualizer.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Create a default fully qualified app name.
 If the release name already contains the chart name, use the release name alone
-to avoid duplication (e.g. "kueue-plugin-kueue-plugin").
+to avoid duplication (e.g. "kueue-visualizer-kueue-visualizer").
 */}}
-{{- define "kueue-plugin.fullname" -}}
+{{- define "kueue-visualizer.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -26,16 +26,16 @@ to avoid duplication (e.g. "kueue-plugin-kueue-plugin").
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "kueue-plugin.chart" -}}
+{{- define "kueue-visualizer.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "kueue-plugin.labels" -}}
-helm.sh/chart: {{ include "kueue-plugin.chart" . }}
-{{ include "kueue-plugin.selectorLabels" . }}
+{{- define "kueue-visualizer.labels" -}}
+helm.sh/chart: {{ include "kueue-visualizer.chart" . }}
+{{ include "kueue-visualizer.selectorLabels" . }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
@@ -43,17 +43,17 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "kueue-plugin.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "kueue-plugin.name" . }}
+{{- define "kueue-visualizer.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "kueue-visualizer.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use.
 */}}
-{{- define "kueue-plugin.serviceAccountName" -}}
+{{- define "kueue-visualizer.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "kueue-plugin.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "kueue-visualizer.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}

@@ -20,7 +20,7 @@ usage() {
     cat <<EOF
 Usage: $(basename "$0") [VERSION]
 
-Build and push the kueue-plugin container image to Quay.io.
+Build and push the kueue-visualizer container image to Quay.io.
 
 Arguments:
   VERSION   Version tag for the image (e.g. 0.5.0, 0.5.0-rc1). If omitted,
@@ -34,7 +34,7 @@ EOF
 }
 
 # Image configuration
-image_name="kueue-plugin"
+image_name="kueue-visualizer"
 containerfile="Containerfile"
 context="."
 

@@ -1,5 +1,5 @@
 apiVersion: v2
-name: kueue-plugin
+name: kueue-visualizer
 description: Kueue visibility plugin for the RHOAI Dashboard
 type: application
 version: 0.1.0
@@ -9,6 +9,6 @@ keywords:
   - openshift-ai
   - plugin
   - kueue
-home: https://github.com/rh-ai-community-plugins/kueue-plugin
+home: https://github.com/rh-ai-community-plugins/kueue-visualizer
 sources:
-  - https://github.com/rh-ai-community-plugins/kueue-plugin
+  - https://github.com/rh-ai-community-plugins/kueue-visualizer

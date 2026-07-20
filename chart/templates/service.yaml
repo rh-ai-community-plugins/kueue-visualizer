@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "kueue-plugin.fullname" . }}
+  name: {{ include "kueue-visualizer.fullname" . }}
   labels:
-    {{- include "kueue-plugin.labels" . | nindent 4 }}
+    {{- include "kueue-visualizer.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type }}
   ports:
@@ -11,4 +11,4 @@ spec:
       targetPort: {{ .Values.service.targetPort }}
       protocol: TCP
   selector:
-    {{- include "kueue-plugin.selectorLabels" . | nindent 4 }}
+    {{- include "kueue-visualizer.selectorLabels" . | nindent 4 }}

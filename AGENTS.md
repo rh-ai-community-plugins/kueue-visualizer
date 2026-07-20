@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is `kueue-plugin`, a community plugin for the **Red Hat OpenShift AI (RHOAI) Dashboard** that provides visibility into Kueue workload scheduling. It uses Webpack 5 Module Federation to expose remote modules that the RHOAI dashboard host application loads at runtime.
+This is `kueue-visualizer`, a community plugin for the **Red Hat OpenShift AI (RHOAI) Dashboard** that provides visibility into Kueue workload scheduling. It uses Webpack 5 Module Federation to expose remote modules that the RHOAI dashboard host application loads at runtime.
 
 ## Build & Development Commands
 

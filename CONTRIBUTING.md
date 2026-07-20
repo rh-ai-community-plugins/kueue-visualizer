@@ -15,7 +15,7 @@ Thank you for your interest in the Kueue community plugin for Red Hat OpenShift 
 
 ## Reporting Issues
 
-Please use [GitHub Issues](https://github.com/rh-ai-community-plugins/kueue-plugin/issues) to report bugs or suggest improvements.
+Please use [GitHub Issues](https://github.com/rh-ai-community-plugins/kueue-visualizer/issues) to report bugs or suggest improvements.
 
 ## License
 

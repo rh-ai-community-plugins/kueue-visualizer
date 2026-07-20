@@ -2,7 +2,7 @@
 
 # Container image settings
 REGISTRY       ?= quay.io/rh-ai-community-plugins
-IMAGE          ?= kueue-plugin
+IMAGE          ?= kueue-visualizer
 VERSION        ?=
 BUILDER        ?= podman
 IMAGE_TAG      ?= latest
