@@ -420,7 +420,7 @@ const CohortDetail: React.FC<{ cohortName: string; clusterQueues: ClusterQueue[]
                   <strong style={{ color: 'var(--pf-t--global--text--color--regular)' }}>{flavorName}</strong> · {resName}
                   {': '}{fmt(used, key)} / {fmt(nominal, key)}
                   {borrowed > 0 && (
-                    <Label color="gold" isCompact style={{ marginLeft: 'var(--pf-t--global--spacer--xs)' }}>
+                    <Label color="yellow" isCompact style={{ marginLeft: 'var(--pf-t--global--spacer--xs)' }}>
                       {fmt(borrowed, key)} borrowed
                     </Label>
                   )}
@@ -653,9 +653,9 @@ const HelpTip: React.FC<{ content: string }> = ({ content }) => (
   </Tooltip>
 );
 
-function kindColor(kind: string): 'cyan' | 'blue' | 'purple' | 'green' | 'grey' {
-  const map: Record<string, 'cyan' | 'blue' | 'purple' | 'green' | 'grey'> = {
-    LocalQueue: 'cyan',
+function kindColor(kind: string): 'teal' | 'blue' | 'purple' | 'green' | 'grey' {
+  const map: Record<string, 'teal' | 'blue' | 'purple' | 'green' | 'grey'> = {
+    LocalQueue: 'teal',
     ClusterQueue: 'blue',
     Cohort: 'purple',
     ResourceFlavor: 'green',

@@ -75,7 +75,7 @@ const NamespacesPanel: React.FC<NamespacesPanelProps> = ({ namespaces, localQueu
                   ) : (
                     <LabelGroup>
                       {nsLocalQueues.map((lq) => (
-                        <Label key={lq.metadata.name} color="cyan" isCompact>
+                        <Label key={lq.metadata.name} color="teal" isCompact>
                           {lq.metadata.name}
                         </Label>
                       ))}
@@ -141,7 +141,7 @@ const NamespacesPanel: React.FC<NamespacesPanelProps> = ({ namespaces, localQueu
                             const cq = clusterQueues.find((c) => c.metadata.name === lq.spec.clusterQueue);
                             return (
                               <Tr key={lq.metadata.name}>
-                                <Td><Label color="cyan" isCompact>{lq.metadata.name}</Label></Td>
+                                <Td><Label color="teal" isCompact>{lq.metadata.name}</Label></Td>
                                 <Td><Label color="blue" isCompact>{lq.spec.clusterQueue}</Label></Td>
                                 <Td>
                                   {cq?.spec.cohort

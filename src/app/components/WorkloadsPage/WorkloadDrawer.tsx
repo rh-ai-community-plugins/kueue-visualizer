@@ -87,7 +87,7 @@ const WorkloadDrawer: React.FC<WorkloadDrawerProps> = ({
             <DescriptionListGroup>
               <DescriptionListTerm>Local Queue</DescriptionListTerm>
               <DescriptionListDescription>
-                <Label color="cyan" isCompact>{workload.spec.queueName}</Label>
+                <Label color="teal" isCompact>{workload.spec.queueName}</Label>
                 {workload.metadata.namespace && (
                   <span style={{ marginLeft: 'var(--pf-t--global--spacer--sm)', color: 'var(--pf-t--global--text--color--subtle)', fontSize: '0.85em' }}>
                     ({workload.metadata.namespace})
