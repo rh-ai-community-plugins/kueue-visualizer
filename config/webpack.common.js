@@ -50,7 +50,7 @@ module.exports = {
       template: path.resolve(__dirname, '../src/index.html'),
     }),
     new ModuleFederationPlugin({
-      name: 'kueuePlugin',
+      name: 'kueueVisualizer',
       filename: moduleFederation.remoteEntry,
       exposes: {
         './extensions': './src/rhoai/extensions.ts',

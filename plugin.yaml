@@ -35,17 +35,17 @@ install:
 remote:
   type: module-federation
   spec:
-    name: kueuePlugin                # [PLUGIN-SPECIFIC] Module Federation container name (camelCase)
-    scope: kueuePlugin               # [PLUGIN-SPECIFIC] must match name above
+    name: kueueVisualizer                # [PLUGIN-SPECIFIC] Module Federation container name (camelCase)
+    scope: kueueVisualizer               # [PLUGIN-SPECIFIC] must match name above
     # [PLUGIN-SPECIFIC] Update this URL to point to your deployed OpenShift route.
     remoteEntry: https://<your-openshift-route>/remoteEntry.js
     paths:
       - type: route
         path: /kueue                 # [PLUGIN-SPECIFIC] must match route prefix in extensions.ts
         extensions:
-          - kueuePlugin/extensions   # [PLUGIN-SPECIFIC] {scope}/extensions
+          - kueueVisualizer/extensions   # [PLUGIN-SPECIFIC] {scope}/extensions
       - type: icon
-        path: kueuePlugin/Icon       # [PLUGIN-SPECIFIC] {scope}/Icon
+        path: kueueVisualizer/Icon       # [PLUGIN-SPECIFIC] {scope}/Icon
 
 # --- RBAC (required) ---
 rbac:
