@@ -559,7 +559,6 @@ const UsageBar: React.FC<{
 
   const isBorrowing = borrowedVal > 0;
   const canBorrow = borrowingLimitVal > 0;
-  const _canLend = lendingLimitVal > 0;
 
   const fmtVal = (v: number): string => {
     if (label === 'memory') {
