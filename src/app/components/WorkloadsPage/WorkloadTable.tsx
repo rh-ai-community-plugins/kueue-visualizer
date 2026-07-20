@@ -10,7 +10,7 @@ import {
 } from '@patternfly/react-table';
 import { Label, EmptyState, EmptyStateBody, Button } from '@patternfly/react-core';
 import type { Workload, ClusterQueue, LocalQueue, WorkloadPhase } from '../../types/kueue';
-import { getWorkloadPhase, computeWorkloadQueueInfo } from '../../hooks/useKueueResources';
+import { computeWorkloadQueueInfo } from '../../hooks/useKueueResources';
 
 
 const PHASE_COLORS: Record<WorkloadPhase, 'grey' | 'blue' | 'green' | 'red' | 'orange'> = {

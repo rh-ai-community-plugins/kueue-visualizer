@@ -57,8 +57,7 @@ const QueueInfrastructurePage: React.FC = () => {
     if (nsParam && nsParam !== selectedProject) {
       setSelectedProject(nsParam);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // eslint-disable-line -- intentional: only run on mount to sync ?ns= URL param
 
   // Auto-refresh every 30 seconds without a full page reload
   useInterval(() => {

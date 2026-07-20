@@ -22,7 +22,7 @@ import {
   Divider,
   Tooltip,
 } from '@patternfly/react-core';
-import type { ClusterQueue, LocalQueue, QueueTopologyNode, FlavorUsage } from '../../types/kueue';
+import type { ClusterQueue, LocalQueue, QueueTopologyNode } from '../../types/kueue';
 import { parseQuantity } from '../../utils/quantity';
 
 interface NodeDetailPanelProps {
@@ -559,7 +559,7 @@ const UsageBar: React.FC<{
 
   const isBorrowing = borrowedVal > 0;
   const canBorrow = borrowingLimitVal > 0;
-  const canLend = lendingLimitVal > 0;
+  const _canLend = lendingLimitVal > 0;
 
   const fmtVal = (v: number): string => {
     if (label === 'memory') {
@@ -639,8 +639,8 @@ const UsageBar: React.FC<{
 };
 
 const PreemptionLabel: React.FC<{ policy: string }> = ({ policy }) => {
-  const color = policy === 'Never' ? 'grey' : policy === 'LowerPriority' ? 'orange' : 'red';
-  return <Label color={color as any} isCompact>{policy}</Label>;
+  const color: 'grey' | 'orange' | 'red' = policy === 'Never' ? 'grey' : policy === 'LowerPriority' ? 'orange' : 'red';
+  return <Label color={color} isCompact>{policy}</Label>;
 };
 
 const HelpTip: React.FC<{ content: string }> = ({ content }) => (

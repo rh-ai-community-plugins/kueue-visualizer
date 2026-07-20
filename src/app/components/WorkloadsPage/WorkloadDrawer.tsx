@@ -17,7 +17,7 @@ import {
   Alert,
 } from '@patternfly/react-core';
 import type { Workload, ClusterQueue, LocalQueue, Condition } from '../../types/kueue';
-import { computeWorkloadQueueInfo, getWorkloadPhase } from '../../hooks/useKueueResources';
+import { computeWorkloadQueueInfo } from '../../hooks/useKueueResources';
 
 interface WorkloadDrawerProps {
   workload: Workload;
@@ -331,7 +331,7 @@ const WhyPending: React.FC<{
 
 const CONDITION_ORDER = ['QuotaReserved', 'Admitted', 'PodsReady', 'Finished'];
 
-const Timeline: React.FC<{ conditions: Condition[]; startTime?: string }> = ({ conditions, startTime }) => {
+const Timeline: React.FC<{ conditions: Condition[]; startTime?: string }> = ({ conditions }) => {
   const events: Array<{ label: string; time: string; done: boolean }> = [
     { label: 'Submitted', time: '', done: true },
   ];
@@ -395,6 +395,7 @@ const PHASE_COLORS = {
 } as const;
 
 const PhaseLabel: React.FC<{ phase: string }> = ({ phase }) => (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   <Label color={(PHASE_COLORS as any)[phase] ?? 'grey'} isCompact>{phase}</Label>
 );
 

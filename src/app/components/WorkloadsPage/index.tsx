@@ -57,8 +57,7 @@ const WorkloadsPage: React.FC = () => {
     if (nsParam && nsParam !== selectedProject) {
       setSelectedProject(nsParam);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // eslint-disable-line -- intentional: only run on mount to sync ?ns= URL param
 
   const filtered = workloads.filter((w) => {
     if (nsFilter && w.metadata.namespace !== nsFilter) return false;
