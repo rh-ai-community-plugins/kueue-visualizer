@@ -19,7 +19,7 @@ deployment_model: cluster-shared     # per-project | cluster-shared | both
 
 image:                               # [PLUGIN-SPECIFIC]
   repository: quay.io/rh-ai-community-plugins/kueue-visualizer
-  tag: "0.1.0"
+  tag: "0.1.1"
 
 # --- Installation (required) ---
 install:
