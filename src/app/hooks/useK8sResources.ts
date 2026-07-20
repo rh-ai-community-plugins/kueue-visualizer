@@ -5,8 +5,8 @@ export type K8sResource = {
   kind: string;
   metadata: {
     name: string;
-    namespace: string;
-    uid: string;
+    namespace?: string;
+    uid?: string;
     creationTimestamp: string;
     labels?: Record<string, string>;
   };

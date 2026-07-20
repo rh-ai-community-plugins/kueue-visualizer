@@ -28,7 +28,7 @@ import {
   RectAnchor,
   useAnchor,
 } from '@patternfly/react-topology';
-import type { ShapeProps, NodeModel, EdgeModel, EdgeProps } from '@patternfly/react-topology';
+import type { ShapeProps, NodeModel, EdgeModel } from '@patternfly/react-topology';
 import type { ClusterQueue, LocalQueue, QueueTopologyNode } from '../../types/kueue';
 import { parseQuantity } from '../../utils/quantity';
 
@@ -279,10 +279,12 @@ const getCustomShape = (element: Node): React.FC<ShapeProps> =>
   SHAPE_BY_KIND[element.getData()?.kind as string] ?? SHAPE_BY_KIND[NODE_CLUSTER_QUEUE];
 
 // Plain edge (no label).
-const PlainEdge: React.FC<EdgeProps> = (props) => <DefaultEdge {...props} />;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const PlainEdge = (props: any) => <DefaultEdge {...props} />;
 
 // Borrowing edge — draws an orange SVG path + inline arrowhead + pill label.
-const BorrowingEdge: React.FC<EdgeProps> = observer((props) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const BorrowingEdge = observer((props: any) => {
   const { element } = props;
   const label = (element.getData?.() as { label?: string } | undefined)?.label ?? '';
   const startPoint = element.getStartPoint?.();
@@ -343,7 +345,7 @@ const TopologyNodeComponent = withSelection()((props: any) => (
 ));
 
 const componentFactory: ComponentFactory = (kind, type) => {
-  if (kind === ModelKind.graph) return withPanZoom({ zoomMin: 0.001 })(GraphComponent);
+  if (kind === ModelKind.graph) return withPanZoom()(GraphComponent);
   if (kind === ModelKind.node) return TopologyNodeComponent;
   if (kind === ModelKind.edge) {
     if (type === 'edge-borrow') return BorrowingEdge;
