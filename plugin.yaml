@@ -7,7 +7,7 @@ version: 0.1.1
 # --- Maintainer (required) ---
 maintainer:                          # [PLUGIN-SPECIFIC]
   name: Robert Lundberg
-  github: rlundber
+  github: RHRolun
 
 # --- RHOAI compatibility (required) ---
 rhoai_compatibility:
