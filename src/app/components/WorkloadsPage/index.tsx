@@ -52,6 +52,7 @@ const WorkloadsPage: React.FC = () => {
   const [selectedWorkload, setSelectedWorkload] = useState<Workload | null>(null);
   const [searchText, setSearchText] = useState(() => searchParams.get('queue') ?? '');
   const [cqFilter, setCqFilter] = useState(() => searchParams.get('cq') ?? '');
+  const [cohortFilter] = useState(() => searchParams.get('cohort') ?? '');
   const [phaseFilter, setPhaseFilter] = useState<WorkloadPhase | ''>('');
   const [phaseOpen, setPhaseOpen] = useState(false);
 
@@ -63,9 +64,21 @@ const WorkloadsPage: React.FC = () => {
     }
   }, []); // eslint-disable-line -- intentional: only run on mount to sync ?ns= URL param
 
+  const cohortCQNames = cohortFilter
+    ? new Set(clusterQueues.filter((cq) => (cq.spec.cohort ?? cq.spec.cohortName) === cohortFilter).map((cq) => cq.metadata.name))
+    : null;
+
   const filtered = workloads.filter((w) => {
     if (nsFilter && w.metadata.namespace !== nsFilter) return false;
     if (!nsFilter && !userNamespaces.has(w.metadata.namespace ?? '')) return false;
+    if (cohortCQNames) {
+      const admittedCQ = w.status?.admission?.clusterQueue;
+      const lq = localQueues.find(
+        (l) => l.metadata.name === w.spec.queueName && l.metadata.namespace === w.metadata.namespace,
+      );
+      const wCQ = admittedCQ ?? lq?.spec.clusterQueue;
+      if (!wCQ || !cohortCQNames.has(wCQ)) return false;
+    }
     if (cqFilter) {
       const admittedCQ = w.status?.admission?.clusterQueue;
       if (admittedCQ !== cqFilter) {
@@ -102,6 +115,17 @@ const WorkloadsPage: React.FC = () => {
       <PageSection>
         <Title headingLevel="h1">Workloads</Title>
       </PageSection>
+
+      {cohortFilter && (
+        <PageSection>
+          <Alert
+            variant="info"
+            title={`Filtered to cohort: ${cohortFilter}`}
+            isInline
+            actionLinks={<Button variant="link" isInline onClick={() => window.history.back()}>← Back to visualizer</Button>}
+          />
+        </PageSection>
+      )}
 
       {error?.startsWith('403') ? (
         <PageSection>

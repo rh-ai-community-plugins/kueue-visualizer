@@ -396,7 +396,7 @@ const CohortDetail: React.FC<{ cohortName: string; clusterQueues: ClusterQueue[]
       <StackItem>
         <Button
           variant="secondary"
-          onClick={() => navigate('/kueue/workloads')}
+          onClick={() => navigate(`/kueue/workloads?cohort=${encodeURIComponent(cohortName)}`)}
         >
           View workloads →
         </Button>

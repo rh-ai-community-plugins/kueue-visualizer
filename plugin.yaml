@@ -2,7 +2,7 @@
 name: kueue-visualizer                   # [PLUGIN-SPECIFIC] unique plugin identifier (kebab-case)
 displayName: Kueue                   # [PLUGIN-SPECIFIC] human-readable name
 description: Kueue queue visibility for the RHOAI Dashboard — queue topology, workload scheduling status, cohort borrowing, and resource flavor mapping.
-version: 0.1.0
+version: 0.1.1
 
 # --- Maintainer (required) ---
 maintainer:                          # [PLUGIN-SPECIFIC]
@@ -19,7 +19,7 @@ deployment_model: cluster-shared     # per-project | cluster-shared | both
 
 image:                               # [PLUGIN-SPECIFIC]
   repository: quay.io/rh-ai-community-plugins/kueue-visualizer
-  tag: "0.1.0"
+  tag: "0.1.1"
 
 # --- Installation (required) ---
 install:

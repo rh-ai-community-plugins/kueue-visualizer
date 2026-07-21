@@ -68,7 +68,8 @@ export interface FlavorUsage {
 
 export interface ClusterQueue extends KubernetesResource {
   spec: {
-    cohort?: string;
+    cohort?: string;       // Kueue < v0.10
+    cohortName?: string;   // Kueue >= v0.10
     queueingStrategy?: 'StrictFIFO' | 'BestEffortFIFO';
     resourceGroups: ResourceGroup[];
     preemption?: {
