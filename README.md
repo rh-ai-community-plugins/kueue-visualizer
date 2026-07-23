@@ -28,7 +28,7 @@ A community plugin for the Red Hat OpenShift AI (RHOAI) Dashboard that provides 
 
 ```bash
 helm install kueue-visualizer chart/ \
-  --namespace kueue-project \
+  --namespace cp-kueue-visualizer \
   --create-namespace
 ```
 
@@ -53,7 +53,7 @@ config.append({
     'tls': False,
     'service': {
       'name': 'kueue-visualizer',
-      'namespace': 'kueue-project',
+      'namespace': 'cp-kueue-visualizer',
       'port': 8080
     }
   }
@@ -105,7 +105,7 @@ make image-push VERSION=0.2.0
 
 ```bash
 helm install kueue-visualizer chart/ \
-  --namespace kueue-project \
+  --namespace cp-kueue-visualizer \
   --create-namespace \
   --set image.repository=quay.io/<your-org>/kueue-visualizer \
   --set image.tag=0.2.0
@@ -117,7 +117,7 @@ helm install kueue-visualizer chart/ \
 
 ```bash
 helm upgrade kueue-visualizer chart/ \
-  --namespace kueue-project \
+  --namespace cp-kueue-visualizer \
   --set image.repository=quay.io/rh-ai-community-plugins/kueue-visualizer \
   --set image.tag=0.2.0
 ```
