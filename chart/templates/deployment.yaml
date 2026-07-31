@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "kueue-visualizer.fullname" . }}
+  namespace: {{ include "kueue-visualizer.namespace" . }}
   labels:
     {{- include "kueue-visualizer.labels" . | nindent 4 }}
 spec:

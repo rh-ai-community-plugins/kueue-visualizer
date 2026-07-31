@@ -3,3 +3,4 @@ dist/
 *.env
 chart/values-*.yaml
 /tmp/
+.claude/settings.local.json

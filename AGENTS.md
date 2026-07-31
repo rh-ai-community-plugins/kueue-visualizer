@@ -39,9 +39,20 @@ Shared singletons (react, react-dom, react-router-dom, @patternfly/react-core, @
 - **Queue Infrastructure** (`src/app/components/QueueInfrastructurePage/`) — Topology graph, node detail panel, cohort borrowing ledger, namespaces table.
 - **Workloads** (`src/app/components/WorkloadsPage/`) — Filterable workload table with detail drawer.
 
+### Components
+
+- **ProjectSelector** (`src/app/components/ProjectSelector.tsx`) — Namespace dropdown with fuzzy filter, favorites (localStorage-backed), system namespace toggle, and close-on-blur.
+- **CreateProjectModal** (`src/app/components/CreateProjectModal.tsx`) — Modal for creating OpenShift projects with Kubernetes-compliant resource name validation and auto-generation from display name.
+
 ### Data Fetching
 
-`src/app/hooks/useKueueResources.ts` — fetches Kueue CRDs via the dashboard's `/api/k8s/*` pass-through proxy. Uses AbortController for cleanup on unmount.
+- `src/app/hooks/useK8sResources.ts` — Generic hook for fetching any K8s resource list via the dashboard's `/api/k8s/*` proxy. Also exports `createK8sResource` and `deleteK8sResource` helpers.
+- `src/app/hooks/useKueueResources.ts` — Fetches Kueue CRDs (ClusterQueues, LocalQueues, Workloads, ResourceFlavors) using `useK8sResources`.
+- `src/app/hooks/useProjects.ts` — Fetches OpenShift projects with optimistic add support.
+- `src/app/hooks/useFavoriteProjects.ts` — localStorage-backed favorite projects.
+- `src/app/hooks/useLastSelectedProject.ts` — Persists last selected project.
+
+All fetch hooks use AbortController for cleanup on unmount.
 
 ### Key Types
 
@@ -66,7 +77,7 @@ Shared singletons (react, react-dom, react-router-dom, @patternfly/react-core, @
 ### Deployment
 
 - **Container**: Multi-stage build in `Containerfile` — UBI9 Node 22 builder → UBI9 Nginx 1.24 serving `dist/` on port 8080 as UID 1001.
-- **Helm chart**: `chart/` deploys Deployment + Service + ClusterRole + ClusterRoleBinding + ServiceAccount + OpenShift Route.
+- **Helm chart**: `chart/` deploys to Kubernetes into the `cp-kueue-visualizer` namespace by default (configurable via `values.yaml`). Includes Namespace + Deployment + Service + ServiceAccount + OpenShift Route.
 
 ### CI/CD Workflows
 

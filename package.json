@@ -1,6 +1,6 @@
 {
   "name": "kueue-visualizer",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "A Kueue visibility plugin for the RHOAI Dashboard",
   "private": true,
   "module-federation": {
@@ -51,6 +51,7 @@
   "devDependencies": {
     "@testing-library/jest-dom": "^6.0.0",
     "@testing-library/react": "^16.0.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/jest": "^29.0.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
@@ -59,10 +60,10 @@
     "@typescript-eslint/parser": "^7.18.0",
     "css-loader": "^7.0.0",
     "eslint": "^8.57.1",
-    "markdownlint-cli2": "^0.23.0",
     "html-webpack-plugin": "^5.0.0",
     "jest": "^30.0.0",
     "jest-environment-jsdom": "^30.0.0",
+    "markdownlint-cli2": "^0.23.0",
     "mini-css-extract-plugin": "^2.10.2",
     "style-loader": "^4.0.0",
     "ts-jest": "^29.0.0",

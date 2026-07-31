@@ -1,3 +1,7 @@
+# -- Target namespace for all namespaced resources.
+# Override with --set namespace=<ns> to deploy elsewhere.
+namespace: cp-kueue-visualizer
+
 image:
   repository: quay.io/rh-ai-community-plugins/kueue-visualizer
   tag: ""
