@@ -21,27 +21,37 @@ export function useProjects() {
   const [error, setError] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback((): Promise<Project[]> => {
     controllerRef.current?.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
 
     setLoading(true);
     setError(null);
-    fetch('/api/k8s/apis/project.openshift.io/v1/projects', { signal: controller.signal })
+    return fetch('/api/k8s/apis/project.openshift.io/v1/projects', { signal: controller.signal })
       .then((res) => {
         if (!res.ok) throw new Error(`Failed to fetch projects: ${res.status}`);
         return res.json();
       })
       .then((data) => {
-        setProjects(data.items ?? []);
+        const items: Project[] = data.items ?? [];
+        setProjects(items);
         setLoading(false);
+        return items;
       })
       .catch((e: Error) => {
-        if (e.name === 'AbortError') return;
+        if (e.name === 'AbortError') return [];
         setError(e.message);
         setLoading(false);
+        return [];
       });
+  }, []);
+
+  const addProject = useCallback((project: Project) => {
+    setProjects((prev) => {
+      if (prev.some((p) => p.metadata.name === project.metadata.name)) return prev;
+      return [...prev, project];
+    });
   }, []);
 
   useEffect(() => {
@@ -49,5 +59,5 @@ export function useProjects() {
     return () => controllerRef.current?.abort();
   }, [refresh]);
 
-  return { projects, loading, error, refresh };
+  return { projects, loading, error, refresh, addProject };
 }

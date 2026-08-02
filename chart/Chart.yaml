@@ -2,8 +2,8 @@ apiVersion: v2
 name: kueue-visualizer-chart
 description: Kueue visibility plugin for the RHOAI Dashboard
 type: application
-version: 0.1.1
-appVersion: "0.1.1"
+version: 0.1.2
+appVersion: "0.1.2"
 keywords:
   - rhoai
   - openshift-ai

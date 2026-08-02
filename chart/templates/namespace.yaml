@@ -1,0 +1,8 @@
+{{- if ne (include "kueue-visualizer.namespace" .) .Release.Namespace }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ include "kueue-visualizer.namespace" . }}
+  labels:
+    {{- include "kueue-visualizer.labels" . | nindent 4 }}
+{{- end }}

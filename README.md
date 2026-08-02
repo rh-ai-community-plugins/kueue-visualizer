@@ -1,4 +1,4 @@
-# Kueue Plugin for RHOAI Dashboard
+# Kueue Visualizer for RHOAI Dashboard
 
 A community plugin for the Red Hat OpenShift AI (RHOAI) Dashboard that provides visibility into Kueue workload scheduling — queue topology, capacity, preemption policies, workload status, cohort borrowing, and resource flavor mapping.
 
